@@ -4,9 +4,10 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef N5X_SOCFPGA_CLOCKMANAGER_H
-#define N5X_SOCFPGA_CLOCKMANAGER_H
+#ifndef CLOCKMANAGER_H
+#define CLOCKMANAGER_H
 
+#include "socfpga_handoff.h"
 
 /* MACRO DEFINITION */
 #define SOCFPGA_GLOBAL_TIMER				0xffd01000
@@ -55,6 +56,5 @@ uint64_t get_l4_clk(void);
 uint32_t get_clk_freq(uint32_t psrc_reg);
 uint32_t get_mpu_clk(void);
 uint32_t get_cpu_clk(void);
-uint32_t get_mpu_periph_clk(void);
 
-#endif /* N5X_SOCFPGA_CLOCKMANAGER_H */
+#endif

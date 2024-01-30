@@ -28,9 +28,6 @@ FVP_DT_PREFIX		:= fvp-base-gicv3-psci
 # the FVP platform. This option defaults to 256.
 FVP_TRUSTED_SRAM_SIZE	:= 256
 
-# Macro to enable helpers for running SPM tests. Disabled by default.
-PLAT_TEST_SPM	:= 0
-
 # This is a very trickly TEMPORARY fix. Enabling ALL features exceeds BL31's
 # progbits limit. We need a way to build all useful configurations while waiting
 # on the fvp to increase its SRAM size. The problem is twofild:
@@ -53,9 +50,11 @@ ifneq (${SPD}, tspd)
 	ENABLE_FEAT_AMU			:= 2
 	ENABLE_FEAT_AMUv1p1		:= 2
 	ENABLE_FEAT_HCX			:= 2
+	ENABLE_MPAM_FOR_LOWER_ELS	:= 2
 	ENABLE_FEAT_RNG			:= 2
 	ENABLE_FEAT_TWED		:= 2
 	ENABLE_FEAT_GCS			:= 2
+	ENABLE_FEAT_RAS			:= 2
 ifeq (${ARCH}, aarch64)
 ifneq (${SPD}, spmd)
 ifeq (${SPM_MM}, 0)
@@ -70,9 +69,11 @@ endif
 
 # enable unconditionally for all builds
 ifeq (${ARCH}, aarch64)
-    ENABLE_BRBE_FOR_NS		:= 2
-    ENABLE_TRBE_FOR_NS		:= 2
+ifeq (${ENABLE_RME},0)
+	ENABLE_BRBE_FOR_NS		:= 2
 endif
+endif
+ENABLE_TRBE_FOR_NS		:= 2
 ENABLE_SYS_REG_TRACE_FOR_NS	:= 2
 ENABLE_FEAT_CSV2_2		:= 2
 ENABLE_FEAT_DIT			:= 2
@@ -212,8 +213,7 @@ else
 					lib/cpus/aarch64/neoverse_e1.S		\
 					lib/cpus/aarch64/cortex_x2.S		\
 					lib/cpus/aarch64/cortex_gelas.S		\
-					lib/cpus/aarch64/nevis.S		\
-					lib/cpus/aarch64/travis.S
+					lib/cpus/aarch64/nevis.S
 	endif
 	# AArch64/AArch32 cores
 	FVP_CPU_LIBS	+=	lib/cpus/aarch64/cortex_a55.S		\
@@ -267,6 +267,11 @@ BL2_SOURCES		+=	plat/arm/board/fvp/aarch64/fvp_helpers.S
 
 BL31_SOURCES		+=	plat/arm/board/fvp/fvp_plat_attest_token.c	\
 				plat/arm/board/fvp/fvp_realm_attest_key.c
+
+# FVP platform does not support RSS, but it can leverage RSS APIs to
+# provide hardcoded token/key on request.
+BL31_SOURCES		+=	lib/psa/delegated_attestation.c
+
 endif
 
 ifeq (${ENABLE_FEAT_RNG_TRAP},1)
@@ -351,10 +356,6 @@ FVP_TOS_FW_CONFIG	:=	${BUILD_PLAT}/fdts/${PLAT}_tsp_fw_config.dtb
 $(eval $(call TOOL_ADD_PAYLOAD,${FVP_TOS_FW_CONFIG},--tos-fw-config,${FVP_TOS_FW_CONFIG}))
 endif
 
-ifeq (${TRANSFER_LIST}, 1)
-include lib/transfer_list/transfer_list.mk
-endif
-
 ifeq (${SPD},spmd)
 
 ifeq ($(ARM_SPMC_MANIFEST_DTS),)
@@ -397,12 +398,8 @@ BL31_SOURCES		+=	lib/cpus/aarch64/cortex_a75_pubsub.c	\
 endif
 endif
 
-ifeq (${HANDLE_EA_EL3_FIRST_NS},1)
-ifeq (${ENABLE_FEAT_RAS},1)
+ifeq (${RAS_FFH_SUPPORT},1)
 BL31_SOURCES		+=	plat/arm/board/fvp/aarch64/fvp_ras.c
-else
-BL31_SOURCES		+= 	plat/arm/board/fvp/aarch64/fvp_ea.c
-endif
 endif
 
 ifneq (${ENABLE_STACK_PROTECTOR},0)
@@ -440,6 +437,10 @@ ifneq (${RESET_TO_BL2}, 0)
     override BL1_SOURCES =
 endif
 
+# RSS is not supported on FVP right now. Thus, we use the mocked version
+# of the provided PSA APIs. They return with success and hard-coded token/key.
+PLAT_RSS_NOT_SUPPORTED	:= 1
+
 # Include Measured Boot makefile before any Crypto library makefile.
 # Crypto library makefile may need default definitions of Measured Boot build
 # flags present in Measured Boot makefile.
@@ -467,6 +468,23 @@ BL1_SOURCES		+=	plat/arm/board/fvp/fvp_common_measured_boot.c	\
 BL2_SOURCES		+=	plat/arm/board/fvp/fvp_common_measured_boot.c	\
 				plat/arm/board/fvp/fvp_bl2_measured_boot.c	\
 				lib/psa/measured_boot.c
+
+# Even though RSS is not supported on FVP (see above), we support overriding
+# PLAT_RSS_NOT_SUPPORTED from the command line, just for the purpose of building
+# the code to detect any build regressions. The resulting firmware will not be
+# functional.
+ifneq (${PLAT_RSS_NOT_SUPPORTED},1)
+    $(warning "RSS is not supported on FVP. The firmware will not be functional.")
+    include drivers/arm/rss/rss_comms.mk
+    BL1_SOURCES		+=	${RSS_COMMS_SOURCES}
+    BL2_SOURCES		+=	${RSS_COMMS_SOURCES}
+    BL31_SOURCES	+=	${RSS_COMMS_SOURCES}
+
+    BL1_CFLAGS		+=	-DPLAT_RSS_COMMS_PAYLOAD_MAX_SIZE=0
+    BL2_CFLAGS		+=	-DPLAT_RSS_COMMS_PAYLOAD_MAX_SIZE=0
+    BL31_CFLAGS		+=	-DPLAT_RSS_COMMS_PAYLOAD_MAX_SIZE=0
+endif
+
 endif
 
 ifeq (${DRTM_SUPPORT}, 1)
@@ -501,25 +519,19 @@ endif
 # Test specific macros, keep them at bottom of this file
 $(eval $(call add_define,PLATFORM_TEST_EA_FFH))
 ifeq (${PLATFORM_TEST_EA_FFH}, 1)
-    ifeq (${FFH_SUPPORT}, 0)
-         $(error "PLATFORM_TEST_EA_FFH expects FFH_SUPPORT to be 1")
+    ifeq (${HANDLE_EA_EL3_FIRST_NS}, 0)
+         $(error "PLATFORM_TEST_EA_FFH expects HANDLE_EA_EL3_FIRST_NS to be 1")
     endif
-
+BL31_SOURCES	+= plat/arm/board/fvp/aarch64/fvp_ea.c
 endif
 
 $(eval $(call add_define,PLATFORM_TEST_RAS_FFH))
 ifeq (${PLATFORM_TEST_RAS_FFH}, 1)
-    ifeq (${ENABLE_FEAT_RAS}, 0)
-         $(error "PLATFORM_TEST_RAS_FFH expects ENABLE_FEAT_RAS to be 1")
-    endif
-    ifeq (${HANDLE_EA_EL3_FIRST_NS}, 0)
-         $(error "PLATFORM_TEST_RAS_FFH expects HANDLE_EA_EL3_FIRST_NS to be 1")
+    ifeq (${RAS_EXTENSION}, 0)
+         $(error "PLATFORM_TEST_RAS_FFH expects RAS_EXTENSION to be 1")
     endif
 endif
 
 ifeq (${ERRATA_ABI_SUPPORT}, 1)
 include plat/arm/board/fvp/fvp_cpu_errata.mk
 endif
-
-# Build macro necessary for running SPM tests on FVP platform
-$(eval $(call add_define,PLAT_TEST_SPM))

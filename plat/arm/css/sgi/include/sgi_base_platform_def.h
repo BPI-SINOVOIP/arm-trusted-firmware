@@ -34,10 +34,10 @@
  */
 #if defined(IMAGE_BL31)
 # if SPM_MM || (SPMC_AT_EL3 && SPMC_AT_EL3_SEL0_SP)
-#  define PLAT_ARM_MMAP_ENTRIES		(10  + ((CSS_SGI_CHIP_COUNT - 1) * 3))
-#  define MAX_XLAT_TABLES		(8  + ((CSS_SGI_CHIP_COUNT - 1) * 3))
-#  define PLAT_SP_IMAGE_MMAP_REGIONS	12
-#  define PLAT_SP_IMAGE_MAX_XLAT_TABLES	14
+#  define PLAT_ARM_MMAP_ENTRIES		(9  + ((CSS_SGI_CHIP_COUNT - 1) * 3))
+#  define MAX_XLAT_TABLES		(7  + ((CSS_SGI_CHIP_COUNT - 1) * 3))
+#  define PLAT_SP_IMAGE_MMAP_REGIONS	10
+#  define PLAT_SP_IMAGE_MAX_XLAT_TABLES	12
 # else
 #  define PLAT_ARM_MMAP_ENTRIES		(5 + ((CSS_SGI_CHIP_COUNT - 1) * 3))
 #  define MAX_XLAT_TABLES		(6 + ((CSS_SGI_CHIP_COUNT - 1) * 3))
@@ -105,7 +105,7 @@
  * A buffer of ~35KB is added to account for future expansion of the image,
  * making it a total of 100KB.
  */
-#define CSS_SGI_BL31_SIZE		(116 * 1024)	/* 116 KB */
+#define CSS_SGI_BL31_SIZE		(100 * 1024)	/* 100 KB */
 #define PLAT_ARM_MAX_BL31_SIZE		(CSS_SGI_BL31_SIZE +		\
 						PLAT_ARM_MAX_BL2_SIZE +	\
 						PLAT_ARM_MAX_BL1_RW_SIZE)
@@ -204,20 +204,20 @@
 					SOC_CSS_DEVICE_SIZE,	\
 					MT_DEVICE | MT_RW | MT_SECURE | MT_USER)
 
-#if ENABLE_FEAT_RAS && FFH_SUPPORT
+#if RAS_FFH_SUPPORT
 #define PLAT_SP_PRI				PLAT_RAS_PRI
 #else
 #define PLAT_SP_PRI				0x10
 #endif
 
-#if (SPM_MM || (SPMC_AT_EL3 && SPMC_AT_EL3_SEL0_SP)) && ENABLE_FEAT_RAS && FFH_SUPPORT
+#if (SPM_MM || (SPMC_AT_EL3 && SPMC_AT_EL3_SEL0_SP)) && RAS_FFH_SUPPORT
 /*
  * CPER buffer memory of 128KB is reserved and it is placed adjacent to the
  * memory shared between EL3 and S-EL0.
  */
 #define CSS_SGI_SP_CPER_BUF_BASE	(PLAT_SP_IMAGE_NS_BUF_BASE + \
 					 PLAT_SP_IMAGE_NS_BUF_SIZE)
-#define CSS_SGI_SP_CPER_BUF_SIZE	ULL(0x10000)
+#define CSS_SGI_SP_CPER_BUF_SIZE	ULL(0x20000)
 #define CSS_SGI_SP_CPER_BUF_MMAP	MAP_REGION2(			       \
 						CSS_SGI_SP_CPER_BUF_BASE,      \
 						CSS_SGI_SP_CPER_BUF_BASE,      \
@@ -239,7 +239,7 @@
  */
 #define PLAT_ARM_SP_IMAGE_STACK_BASE	(PLAT_SP_IMAGE_NS_BUF_BASE +	\
 					 PLAT_SP_IMAGE_NS_BUF_SIZE)
-#endif /* SPM_MM && ENABLE_FEAT_RAS && FFH_SUPPORT */
+#endif /* SPM_MM && RAS_FFH_SUPPORT */
 
 /* Platform ID address */
 #define SSC_VERSION                     (SSC_REG_BASE + SSC_VERSION_OFFSET)

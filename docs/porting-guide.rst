@@ -319,6 +319,13 @@ also be defined:
    Firmware Update (FWU) certificate identifier, used by NS_BL1U to load the
    FWU content certificate.
 
+-  **#define : PLAT_CRYPTOCELL_BASE**
+
+   This defines the base address of Arm® TrustZone® CryptoCell and must be
+   defined if CryptoCell crypto driver is used for Trusted Board Boot. For
+   capable Arm platforms, this driver is used if ``ARM_CRYPTOCELL_INTEG`` is
+   set.
+
 If the AP Firmware Updater Configuration image, BL2U is used, the following
 must also be defined:
 
@@ -3291,10 +3298,10 @@ Function : plat_ea_handler
     Argument : uint64_t
     Return   : void
 
-This function is invoked by the runtime exception handling framework for the
-platform to handle an External Abort received at EL3. The intention of the
-function is to attempt to resolve the cause of External Abort and return;
-if that's not possible then an orderly shutdown of the system is initiated.
+This function is invoked by the RAS framework for the platform to handle an
+External Abort received at EL3. The intention of the function is to attempt to
+resolve the cause of External Abort and return; if that's not possible, to
+initiate orderly shutdown of the system.
 
 The first parameter (``int ea_reason``) indicates the reason for External Abort.
 Its value is one of ``ERROR_EA_*`` constants defined in ``ea_handle.h``.
@@ -3309,8 +3316,13 @@ The third parameter (``void *cookie``) is unused for now. The fourth parameter
 (``uint64_t flags``) indicates the preempted security state. These parameters
 are received from the top-level exception handler.
 
-This function must be implemented if a platform expects Firmware First handling
-of External Aborts.
+If ``RAS_FFH_SUPPORT`` is set to ``1``, the default implementation of this
+function iterates through RAS handlers registered by the platform. If any of the
+RAS handlers resolve the External Abort, no further action is taken.
+
+If ``RAS_FFH_SUPPORT`` is set to ``0``, or if none of the platform RAS handlers
+could resolve the External Abort, the default implementation prints an error
+message, and panics.
 
 Function : plat_handle_uncontainable_ea
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

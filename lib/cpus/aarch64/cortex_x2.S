@@ -50,7 +50,7 @@ workaround_reset_start cortex_x2, ERRATUM(2058056), ERRATA_X2_2058056
 	CORTEX_X2_CPUECTLR2_EL1_PF_MODE_SHIFT, CORTEX_X2_CPUECTLR2_EL1_PF_MODE_WIDTH
 workaround_reset_end cortex_x2, ERRATUM(2058056)
 
-check_erratum_ls cortex_x2, ERRATUM(2058056), CPU_REV(2, 1)
+check_erratum_ls cortex_x2, ERRATUM(2058056), CPU_REV(2, 0)
 
 workaround_reset_start cortex_x2, ERRATUM(2081180), ERRATA_X2_2081180
 	/* Apply instruction patching sequence */
@@ -118,26 +118,12 @@ workaround_reset_end cortex_x2, ERRATUM(2371105)
 
 check_erratum_ls cortex_x2, ERRATUM(2371105), CPU_REV(2, 0)
 
-workaround_reset_start cortex_x2, ERRATUM(2742423), ERRATA_X2_2742423
-	/* Set CPUACTLR5_EL1[56:55] to 2'b01 */
-	sysreg_bit_set CORTEX_X2_CPUACTLR5_EL1, BIT(55)
-	sysreg_bit_clear CORTEX_X2_CPUACTLR5_EL1, BIT(56)
-workaround_reset_end cortex_x2, ERRATUM(2742423)
-
-check_erratum_ls cortex_x2, ERRATUM(2742423), CPU_REV(2, 1)
-
 workaround_reset_start cortex_x2, ERRATUM(2768515), ERRATA_X2_2768515
 	/* dsb before isb of power down sequence */
 	dsb	sy
 workaround_reset_end cortex_x2, ERRATUM(2768515)
 
 check_erratum_ls cortex_x2, ERRATUM(2768515), CPU_REV(2, 1)
-
-workaround_reset_start cortex_x2, ERRATUM(2778471), ERRATA_X2_2778471
-	sysreg_bit_set CORTEX_X2_CPUACTLR3_EL1, BIT(47)
-workaround_reset_end cortex_x2, ERRATUM(2778471)
-
-check_erratum_ls cortex_x2, ERRATUM(2778471), CPU_REV(2, 1)
 
 workaround_reset_start cortex_x2, CVE(2022, 23960), WORKAROUND_CVE_2022_23960
 #if IMAGE_BL31

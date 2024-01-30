@@ -80,14 +80,14 @@ workaround_reset_start cortex_a710, ERRATUM(2055002), ERRATA_A710_2055002
 	sysreg_bit_set	CORTEX_A710_CPUACTLR_EL1, CORTEX_A710_CPUACTLR_EL1_BIT_46
 workaround_reset_end cortex_a710, ERRATUM(2055002)
 
-check_erratum_range cortex_a710, ERRATUM(2055002), CPU_REV(1, 0), CPU_REV(2, 0)
+check_erratum_ls cortex_a710, ERRATUM(2055002), CPU_REV(2, 0)
 
 workaround_reset_start cortex_a710, ERRATUM(2058056), ERRATA_A710_2058056
 	sysreg_bitfield_insert CORTEX_A710_CPUECTLR2_EL1, CORTEX_A710_CPUECTLR2_EL1_PF_MODE_CNSRV, \
 		CPUECTLR2_EL1_PF_MODE_LSB, CPUECTLR2_EL1_PF_MODE_WIDTH
 workaround_reset_end cortex_a710, ERRATUM(2058056)
 
-check_erratum_ls cortex_a710, ERRATUM(2058056), CPU_REV(2, 1)
+check_erratum_ls cortex_a710, ERRATUM(2058056), CPU_REV(2, 0)
 
 workaround_reset_start cortex_a710, ERRATUM(2081180), ERRATA_A710_2081180
 	ldr	x0,=0x3
@@ -178,26 +178,12 @@ workaround_reset_end cortex_a710, ERRATUM(2371105)
 
 check_erratum_ls cortex_a710, ERRATUM(2371105), CPU_REV(2, 0)
 
-workaround_reset_start cortex_a710, ERRATUM(2742423), ERRATA_A710_2742423
-	/* Set CPUACTLR5_EL1[56:55] to 2'b01 */
-	sysreg_bit_set CORTEX_A710_CPUACTLR5_EL1, BIT(55)
-	sysreg_bit_clear CORTEX_A710_CPUACTLR5_EL1, BIT(56)
-workaround_reset_end cortex_a710, ERRATUM(2742423)
-
-check_erratum_ls cortex_a710, ERRATUM(2742423), CPU_REV(2, 1)
-
 workaround_runtime_start cortex_a710, ERRATUM(2768515), ERRATA_A710_2768515
 	/* dsb before isb of power down sequence */
 	dsb	sy
 workaround_runtime_end cortex_a710, ERRATUM(2768515), NO_ISB
 
 check_erratum_ls cortex_a710, ERRATUM(2768515), CPU_REV(2, 1)
-
-workaround_reset_start cortex_a710, ERRATUM(2778471), ERRATA_A710_2778471
-	sysreg_bit_set CORTEX_A710_CPUACTLR3_EL1, BIT(47)
-workaround_reset_end cortex_a710, ERRATUM(2778471)
-
-check_erratum_ls cortex_a710, ERRATUM(2778471), CPU_REV(2, 1)
 
 workaround_reset_start cortex_a710, CVE(2022, 23960), WORKAROUND_CVE_2022_23960
 #if IMAGE_BL31

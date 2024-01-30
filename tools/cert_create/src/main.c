@@ -441,8 +441,7 @@ int main(int argc, char *argv[])
 #endif
 
 		/* First try to load the key from disk */
-		err_code = key_load(&keys[i]);
-		if (err_code == KEY_ERR_NONE) {
+		if (key_load(&keys[i], &err_code)) {
 			/* Key loaded successfully */
 			continue;
 		}

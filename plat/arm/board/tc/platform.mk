@@ -9,11 +9,6 @@ ifeq ($(TARGET_PLATFORM), 0)
 	$(error Platform ${PLAT}$(TARGET_PLATFORM) is deprecated.)
 endif
 
-ifeq ($(TARGET_PLATFORM), 1)
-        $(warning Platform ${PLAT}$(TARGET_PLATFORM) is deprecated. \
-          Some of the features might not work as expected)
-endif
-
 ifeq ($(shell expr $(TARGET_PLATFORM) \<= 2), 0)
         $(error TARGET_PLATFORM must be less than or equal to 2)
 endif
@@ -25,6 +20,8 @@ CSS_LOAD_SCP_IMAGES	:=	1
 CSS_USE_SCMI_SDS_DRIVER	:=	1
 
 ENABLE_FEAT_RAS		:=	1
+
+RAS_FFH_SUPPORT		:=	0
 
 SDEI_SUPPORT		:=	0
 

@@ -23,12 +23,9 @@
 #define PLAT_CPU_ID_MPIDR_AFF_SHIFT				MPIDR_AFF1_SHIFT
 #define PLAT_L2_RESET_REQ			0xB007C0DE
 
-/* System Counter */
-/* TODO: Update back to 400MHz.
- * This shall be updated to read from L4 clock instead of hardcoded.
- */
-#define PLAT_SYS_COUNTER_FREQ_IN_TICKS				(400000000)
-#define PLAT_SYS_COUNTER_FREQ_IN_MHZ				(400)
+/* System Counter */ /* TODO: Update back to 400MHz */
+#define PLAT_SYS_COUNTER_FREQ_IN_TICKS				(80000000)
+#define PLAT_SYS_COUNTER_FREQ_IN_MHZ				(80)
 
 /* FPGA config helpers */
 #define INTEL_SIP_SMC_FPGA_CONFIG_ADDR				0x400000
@@ -48,7 +45,6 @@
 #define SOCFPGA_SYSMGR_REG_BASE					0x10d12000
 #define SOCFPGA_PINMUX_REG_BASE					0x10d13000
 #define SOCFPGA_NAND_REG_BASE					0x10B80000
-#define SOCFPGA_ECC_QSPI_REG_BASE				0x10A22000
 
 #define SOCFPGA_L4_PER_SCR_REG_BASE				0x10d21000
 #define SOCFPGA_L4_SYS_SCR_REG_BASE				0x10d21100
@@ -87,7 +83,7 @@
 #define GIC_SIZE						(0x00100000)
 
 #define BL2_BASE						(0x00000000)
-#define BL2_LIMIT						(0x0002b000)
+#define BL2_LIMIT						(0x0001b000)
 
 #define BL31_BASE						(0x80000000)
 #define BL31_LIMIT						(0x82000000)
@@ -97,11 +93,6 @@
  ******************************************************************************/
 #define PLAT_UART0_BASE						(0x10C02000)
 #define PLAT_UART1_BASE						(0x10C02100)
-
-/*******************************************************************************
- * WDT related constants
- ******************************************************************************/
-#define WDT_BASE			(0x10D00200)
 
 /*******************************************************************************
  * GIC related constants

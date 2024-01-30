@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2015-2023, Arm Limited and Contributors. All rights reserved.
+# Copyright (c) 2015-2023, ARM Limited and Contributors. All rights reserved.
 #
 # Copyright (c) 2017-2023 Nuvoton Ltd.
 #
@@ -140,9 +140,23 @@ $(error For SEPARATE_NOBITS_REGION, RECLAIM_INIT_CODE cannot be supported)
 endif
 endif
 
+# Disable ARM Cryptocell by default
+ARM_CRYPTOCELL_INTEG	:=	0
+$(eval $(call assert_boolean,ARM_CRYPTOCELL_INTEG))
+$(eval $(call add_define,ARM_CRYPTOCELL_INTEG))
+
 # Enable PIE support for RESET_TO_BL31 case
 ifeq (${RESET_TO_BL31},1)
 ENABLE_PIE	:=	1
+endif
+
+# CryptoCell integration relies on coherent buffers for passing data from
+# the AP CPU to the CryptoCell
+
+ifeq (${ARM_CRYPTOCELL_INTEG},1)
+ifeq (${USE_COHERENT_MEM},0)
+$(error "ARM_CRYPTOCELL_INTEG needs USE_COHERENT_MEM to be set.")
+endif
 endif
 
 PLAT_INCLUDES	:=	-Iinclude/plat/nuvoton/npcm845x \
@@ -259,11 +273,9 @@ ifeq (${ENABLE_PMF}, 1)
 ifeq (${ARCH}, aarch64)
 BL31_SOURCES	+=	plat/arm/common/aarch64/execution_state_switch.c \
 		plat/arm/common/arm_sip_svc.c \
-		plat/arm/common/plat_arm_sip_svc.c \
 		lib/pmf/pmf_smc.c
 else
 BL32_SOURCES	+=	plat/arm/common/arm_sip_svc.c \
-		plat/arm/common/plat_arm_sip_svc.c \
 		lib/pmf/pmf_smc.c
 endif
 endif
@@ -325,7 +337,11 @@ BL2_SOURCES	+=	${AUTH_SOURCES} \
 $(eval $(call TOOL_ADD_IMG,ns_bl2u,--fwu,FWU_))
 
 # We expect to locate the *.mk files under the directories specified below
+ifeq (${ARM_CRYPTOCELL_INTEG},0)
 CRYPTO_LIB_MK	:=	drivers/auth/mbedtls/mbedtls_crypto.mk
+else
+CRYPTO_LIB_MK	:=	drivers/auth/cryptocell/cryptocell_crypto.mk
+endif
 
 IMG_PARSER_LIB_MK := drivers/auth/mbedtls/mbedtls_x509.mk
 

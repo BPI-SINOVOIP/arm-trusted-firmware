@@ -9,8 +9,4 @@
 
 void prepare_dtb(void);
 
-#if defined(XILINX_OF_BOARD_DTB_ADDR)
-int32_t is_valid_dtb(void *fdt);
-#endif
-
 #endif /* PLAT_FDT_H */

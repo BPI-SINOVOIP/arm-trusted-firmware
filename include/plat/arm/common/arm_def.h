@@ -196,7 +196,16 @@ MEASURED_BOOT
 					ARM_AP_TZC_DRAM1_SIZE - 1U)
 
 /* Define the Access permissions for Secure peripherals to NS_DRAM */
+#if ARM_CRYPTOCELL_INTEG
+/*
+ * Allow Secure peripheral to read NS DRAM when integrated with CryptoCell.
+ * This is required by CryptoCell to authenticate BL33 which is loaded
+ * into the Non Secure DDR.
+ */
+#define ARM_TZC_NS_DRAM_S_ACCESS	TZC_REGION_S_RD
+#else
 #define ARM_TZC_NS_DRAM_S_ACCESS	TZC_REGION_S_NONE
+#endif
 
 #ifdef SPD_opteed
 /*
@@ -765,7 +774,7 @@ MEASURED_BOOT
 #define PLAT_PERCPU_BAKERY_LOCK_SIZE		(1 * CACHE_WRITEBACK_GRANULE)
 
 /* Priority levels for ARM platforms */
-#if ENABLE_FEAT_RAS && FFH_SUPPORT
+#if RAS_FFH_SUPPORT
 #define PLAT_RAS_PRI			0x10
 #endif
 #define PLAT_SDEI_CRITICAL_PRI		0x60

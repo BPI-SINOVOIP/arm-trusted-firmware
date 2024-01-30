@@ -7,8 +7,11 @@
 #ifndef CAD_WATCHDOG_H
 #define CAD_WATCHDOG_H
 
-#include "socfpga_plat_def.h"
-
+#if PLATFORM_MODEL == PLAT_SOCFPGA_AGILEX5
+#define WDT_BASE			(0x10D00200)
+#else
+#define WDT_BASE			(0xFFD00200)
+#endif
 #define WDT_REG_SIZE_OFFSET		(0x4)
 #define WDT_MIN_CYCLES			(65536)
 #define WDT_PERIOD			(20)

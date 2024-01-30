@@ -962,7 +962,6 @@
 #define EC_AARCH64_HVC			U(0x16)
 #define EC_AARCH64_SMC			U(0x17)
 #define EC_AARCH64_SYS			U(0x18)
-#define EC_IMP_DEF_EL3			U(0x1f)
 #define EC_IABORT_LOWER_EL		U(0x20)
 #define EC_IABORT_CUR_EL		U(0x21)
 #define EC_PC_ALIGN			U(0x22)
@@ -1232,9 +1231,7 @@
 
 /* MPAM register definitions */
 #define MPAM3_EL3_MPAMEN_BIT		(ULL(1) << 63)
-#define MPAM3_EL3_TRAPLOWER_BIT		(ULL(1) << 62)
 #define MPAMHCR_EL2_TRAP_MPAMIDR_EL1	(ULL(1) << 31)
-#define MPAM3_EL3_RESET_VAL		MPAM3_EL3_TRAPLOWER_BIT
 
 #define MPAM2_EL2_TRAPMPAM0EL1		(ULL(1) << 49)
 #define MPAM2_EL2_TRAPMPAM1EL1		(ULL(1) << 48)
@@ -1417,7 +1414,6 @@
 #define DSU_CLUSTER_PWR_OFF	0
 #define DSU_CLUSTER_PWR_ON	1
 #define DSU_CLUSTER_PWR_MASK	U(1)
-#define DSU_CLUSTER_MEM_RET	BIT(1)
 
 /*******************************************************************************
  * Definitions for CPU Power/Performance Management registers

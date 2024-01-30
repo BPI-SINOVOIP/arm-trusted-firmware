@@ -25,18 +25,6 @@ issues found, additional release candidates may be created to fix the issues.
          code freeze       ver w.x       code freeze     ver y.z
 
 
-Version numbering
-~~~~~~~~~~~~~~~~~
-TF-A version is given in Makefile, through several macros:
-
-- VERSION_MAJOR
-- VERSION_MINOR
-- VERSION_PATCH
-
-For example, TF-A v2.10 has VERSION_MAJOR=2, VERSION_MINOR=10 and VERSION_PATCH=0.
-
-This VERSION_PATCH macro is only increased for LTS releases.
-
 Upcoming Releases
 ~~~~~~~~~~~~~~~~~
 
@@ -81,9 +69,7 @@ after which it will be removed.
 |                                | Date        | after   |                                                         |
 |                                |             | Release |                                                         |
 +================================+=============+=========+=========================================================+
-| Mbedtls-2.x                    |     2.10    |   2.10  | Support for TF-A builds with Mbedtls-2.x will be removed|
-+--------------------------------+-------------+---------+---------------------------------------------------------+
-| STM32MP15_OPTEE_RSV_SHM        |     2.10    |   3.0   | OP-TEE manages its own memory on STM32MP15              |
+| None at this time              |             |         |                                                         |
 +--------------------------------+-------------+---------+---------------------------------------------------------+
 
 Removal of Deprecated Drivers
@@ -98,7 +84,9 @@ after which it will be removed.
 |                                | Date        | after   |                                                         |
 |                                |             | Release |                                                         |
 +================================+=============+=========+=========================================================+
-| None at this time.             |             |         |                                                         |
+| CryptoCell-712                 |     2.9     |   2.10  | No longer maintained.                                   |
++--------------------------------+-------------+---------+---------------------------------------------------------+
+| CryptoCell-713                 |     2.9     |   2.10  | No longer maintained.                                   |
 +--------------------------------+-------------+---------+---------------------------------------------------------+
 
 --------------

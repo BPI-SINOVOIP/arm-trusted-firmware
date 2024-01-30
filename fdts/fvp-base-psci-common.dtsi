@@ -27,12 +27,11 @@
 	#address-cells = <2>;
 	#size-cells = <2>;
 
-	chosen {
-		stdout-path = "serial0:115200n8";
 #if (ENABLE_RME == 1)
-		bootargs = "console=ttyAMA0 earlycon=pl011,0x1c090000 root=/dev/vda ip=on";
+	chosen { bootargs = "console=ttyAMA0 earlycon=pl011,0x1c090000 root=/dev/vda ip=on";};
+#else
+	chosen {};
 #endif
-	};
 
 	aliases {
 		serial0 = &v2m_serial0;
@@ -244,9 +243,6 @@
 				<0 0 39 &gic 0 GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>,
 				<0 0 40 &gic 0 GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
 				<0 0 41 &gic 0 GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>,
-				<0 0 42 &gic 0 GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>,
-				<0 0 43 &gic 0 GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>,
-				<0 0 44 &gic 0 GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>,
-				<0 0 46 &gic 0 GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
+				<0 0 42 &gic 0 GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>;
 	};
 };

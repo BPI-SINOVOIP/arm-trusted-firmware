@@ -128,11 +128,6 @@
  */
 #define PLAT_ARM_NS_IMAGE_BASE		(ARM_DRAM1_BASE + UL(0x8000000))
 
-#if TRANSFER_LIST
-#define FW_HANDOFF_SIZE			0x4000
-#define FW_NS_HANDOFF_BASE		(PLAT_ARM_NS_IMAGE_BASE - FW_HANDOFF_SIZE)
-#endif
-
 /*
  * PLAT_ARM_MMAP_ENTRIES depends on the number of entries in the
  * plat_arm_mmap array defined for each BL stage.
@@ -193,10 +188,8 @@ defined(IMAGE_BL2) && MEASURED_BOOT
 /*
  * PLAT_ARM_MAX_BL1_RW_SIZE is calculated using the current BL1 RW debug size
  * plus a little space for growth.
- * In case of PSA Crypto API, few algorithms like ECDSA needs bigger BL1 RW
- * area.
  */
-#if TF_MBEDTLS_KEY_ALG_ID == TF_MBEDTLS_RSA_AND_ECDSA || PSA_CRYPTO
+#if TF_MBEDTLS_KEY_ALG_ID == TF_MBEDTLS_RSA_AND_ECDSA
 #define PLAT_ARM_MAX_BL1_RW_SIZE	UL(0xC000)
 #else
 #define PLAT_ARM_MAX_BL1_RW_SIZE	UL(0xB000)

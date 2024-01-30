@@ -4,10 +4,17 @@ Secure Partition Manager (MM)
 Foreword
 ========
 
-This document describes the implementation where the Secure Partition Manager
-resides at EL3 and management services run from isolated Secure Partitions at
-S-EL0. The communication protocol is established through the Management Mode
-(MM) interface.
+Two implementations of a Secure Partition Manager co-exist in the TF-A codebase:
+
+-  SPM based on the FF-A specification (:ref:`Secure Partition Manager`).
+-  SPM based on the MM interface.
+
+Both implementations differ in their architectures and only one can be selected
+at build time.
+
+This document describes the latter implementation where the Secure Partition Manager
+resides at EL3 and management services run from isolated Secure Partitions at S-EL0.
+The communication protocol is established through the Management Mode (MM) interface.
 
 Background
 ==========

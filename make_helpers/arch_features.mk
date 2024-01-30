@@ -8,9 +8,99 @@
 # and enables them based on the configured architecture version.
 
 # This file follows the following format:
-#   - Enable mandatory feature if applicable to an Arch Version.
-#   - By default disable any mandatory features if they have not been defined yet.
+#   - By default disable any mandatory features.
+#   - Then Enable mandatory feature if applicable to an Arch Version.
 #   - Disable or enable any optional feature this would be enabled/disabled if needed by platform.
+
+#
+################################################################################
+# Set mandatory features by default to zero.
+################################################################################
+#
+
+#----
+# 8.1
+#----
+
+# Flag to enable access to Privileged Access Never bit of PSTATE.
+ENABLE_FEAT_PAN			:=	0
+
+# Flag to enable Virtualization Host Extensions.
+ENABLE_FEAT_VHE			:=	0
+
+#----
+# 8.2
+#----
+
+# Enable RAS Support.
+ENABLE_FEAT_RAS			:=	0
+
+#----
+# 8.3
+#----
+
+# Flag to enable Pointer Authentication. Internal flag not meant for
+# direct setting. Use BRANCH_PROTECTION to enable PAUTH.
+ENABLE_PAUTH			:=	0
+
+# Include pointer authentication (ARMv8.3-PAuth) registers in cpu context. This
+# must be set to 1 if the platform wants to use this feature in the Secure
+# world. It is not necessary for use in the Non-secure world.
+CTX_INCLUDE_PAUTH_REGS		:=	0
+
+#----
+# 8.4
+#----
+
+# Flag to enable Secure EL-2 feature.
+ENABLE_FEAT_SEL2		:=	0
+
+# By default, disable trace filter control register access to lower non-secure
+# exception levels, i.e. NS-EL2, or NS-EL1 if NS-EL2 is implemented, but
+# trace filter control register access is unused if FEAT_TRF is implemented.
+ENABLE_TRF_FOR_NS		:=	0
+
+# Flag to enable Data Independent Timing instructions.
+ENABLE_FEAT_DIT			:=	0
+
+#----
+# 8.5
+#----
+
+# Flag to enable access to the Random Number Generator registers.
+ENABLE_FEAT_RNG			:=	0
+
+# Flag to enable Speculation Barrier Instruction.
+ENABLE_FEAT_SB			:=	0
+
+# Flag to enable Branch Target Identification.
+# Internal flag not meant for direct setting.
+# Use BRANCH_PROTECTION to enable BTI.
+ENABLE_BTI			:=	0
+
+#----
+# 8.6
+#----
+
+# Flag to enable access to the CNTPOFF_EL2 register.
+ENABLE_FEAT_ECV			:=	0
+
+# Flag to enable access to the HDFGRTR_EL2 register.
+ENABLE_FEAT_FGT			:=	0
+
+#----
+# 8.7
+#----
+
+# Flag to enable access to the HCRX_EL2 register by setting SCR_EL3.HXEn.
+ENABLE_FEAT_HCX			:=	0
+
+#----
+# 8.9
+#----
+
+# Flag to enable access to TCR2 (FEAT_TCR2).
+ENABLE_FEAT_TCR2		:=	0
 
 #
 ################################################################################
@@ -66,97 +156,6 @@ endif
 
 #
 ################################################################################
-# Set mandatory features by default to zero.
-################################################################################
-#
-
-#----
-# 8.1
-#----
-
-# Flag to enable access to Privileged Access Never bit of PSTATE.
-ENABLE_FEAT_PAN			?=	0
-
-# Flag to enable Virtualization Host Extensions.
-ENABLE_FEAT_VHE			?=	0
-
-#----
-# 8.2
-#----
-
-# Enable RAS Support.
-ENABLE_FEAT_RAS			?=	0
-
-#----
-# 8.3
-#----
-
-# Flag to enable Pointer Authentication. Internal flag not meant for
-# direct setting. Use BRANCH_PROTECTION to enable PAUTH.
-ENABLE_PAUTH			?=	0
-
-# Include pointer authentication (ARMv8.3-PAuth) registers in cpu context. This
-# must be set to 1 if the platform wants to use this feature in the Secure
-# world. It is not necessary for use in the Non-secure world.
-CTX_INCLUDE_PAUTH_REGS		?=	0
-
-
-#----
-# 8.4
-#----
-
-# Flag to enable Secure EL-2 feature.
-ENABLE_FEAT_SEL2		?=	0
-
-# By default, disable trace filter control register access to lower non-secure
-# exception levels, i.e. NS-EL2, or NS-EL1 if NS-EL2 is implemented, but
-# trace filter control register access is unused if FEAT_TRF is implemented.
-ENABLE_TRF_FOR_NS		?=	0
-
-# Flag to enable Data Independent Timing instructions.
-ENABLE_FEAT_DIT			?=	0
-
-#----
-# 8.5
-#----
-
-# Flag to enable Branch Target Identification.
-# Internal flag not meant for direct setting.
-# Use BRANCH_PROTECTION to enable BTI.
-ENABLE_BTI			?=	0
-
-# Flag to enable access to the Random Number Generator registers.
-ENABLE_FEAT_RNG			?=	0
-
-# Flag to enable Speculation Barrier Instruction.
-ENABLE_FEAT_SB			?=	0
-
-#----
-# 8.6
-#----
-
-# Flag to enable access to the CNTPOFF_EL2 register.
-ENABLE_FEAT_ECV			?=	0
-
-# Flag to enable access to the HDFGRTR_EL2 register.
-ENABLE_FEAT_FGT			?=	0
-
-#----
-# 8.7
-#----
-
-# Flag to enable access to the HCRX_EL2 register by setting SCR_EL3.HXEn.
-ENABLE_FEAT_HCX			?=	0
-
-#----
-# 8.9
-#----
-
-# Flag to enable access to TCR2 (FEAT_TCR2).
-ENABLE_FEAT_TCR2		?=	0
-
-#
-################################################################################
 # Optional Features defaulted to 0 or 2, if they are not enabled from
 # build option. Can also be disabled or enabled by platform if needed.
 ################################################################################
@@ -183,25 +182,25 @@ ENABLE_SYS_REG_TRACE_FOR_NS		?=	0
 # Build option to enable/disable the Statistical Profiling Extension,
 # keep it enabled by default for AArch64.
 ifeq (${ARCH},aarch64)
-       ENABLE_SPE_FOR_NS		?=	2
+	ENABLE_SPE_FOR_NS		?=	2
 else ifeq (${ARCH},aarch32)
-       ifneq ($(or $(ENABLE_SPE_FOR_NS),0),0)
-              $(error ENABLE_SPE_FOR_NS is not supported for AArch32)
-       else
-              ENABLE_SPE_FOR_NS		:=	0
-       endif
+	ifdef ENABLE_SPE_FOR_NS
+		$(error ENABLE_SPE_FOR_NS is not supported for AArch32)
+	else
+		ENABLE_SPE_FOR_NS 	:=	0
+	endif
 endif
 
 # Enable SVE for non-secure world by default.
 ifeq (${ARCH},aarch64)
-       ENABLE_SVE_FOR_NS		?=	2
+	ENABLE_SVE_FOR_NS		?=	2
 # SVE is only supported on AArch64 so disable it on AArch32.
 else ifeq (${ARCH},aarch32)
-       ifneq ($(or $(ENABLE_SVE_FOR_NS),0),0)
-              $(error ENABLE_SVE_FOR_NS is not supported for AArch32)
-       else
-              ENABLE_SVE_FOR_NS 	:=	0
-       endif
+	ifdef ENABLE_SVE_FOR_NS
+		$(error ENABLE_SVE_FOR_NS is not supported for AArch32)
+	else
+		ENABLE_SVE_FOR_NS 	:=	0
+	endif
 endif
 
 #----
@@ -215,16 +214,7 @@ ENABLE_AMU_FCONF			?=	0
 AMU_RESTRICT_COUNTERS			?=	0
 
 # Build option to enable MPAM for lower ELs.
-# Enabling it by default
-ifeq (${ARCH},aarch64)
-        ENABLE_FEAT_MPAM		?=	2
-else ifeq (${ARCH},aarch32)
-        ifneq ($(or $(ENABLE_FEAT_MPAM),0),0)
-                $(error ENABLE_FEAT_MPAM is not supported for AArch32)
-        else
-                ENABLE_FEAT_MPAM	:=	0
-        endif
-endif
+ENABLE_MPAM_FOR_LOWER_ELS		?=	0
 
 # Include nested virtualization control (Armv8.4-NV) registers in cpu context.
 # This must be set to 1 if architecture implements Nested Virtualization
@@ -301,13 +291,13 @@ ENABLE_SVE_FOR_SWD			?=	0
 # Note FEAT_TRBE is only supported on AArch64 - therefore do not enable in
 # AArch32.
 ifeq (${ARCH},aarch64)
-        ENABLE_TRBE_FOR_NS		?=	0
+	ENABLE_TRBE_FOR_NS		?=	0
 else ifeq (${ARCH},aarch32)
-        ifneq ($(or $(ENABLE_TRBE_FOR_NS),0),0)
-               $(error ENABLE_TRBE_FOR_NS is not supported for AArch32)
-        else
-               ENABLE_TRBE_FOR_NS 	:=	0
-        endif
+	ifdef ENABLE_TRBE_FOR_NS
+		$(error ENABLE_TRBE_FOR_NS is not supported for AArch32)
+	else
+		ENABLE_TRBE_FOR_NS 	:=	0
+	endif
 endif
 
 #----

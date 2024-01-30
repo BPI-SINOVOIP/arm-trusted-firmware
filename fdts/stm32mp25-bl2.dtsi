@@ -2,3 +2,5 @@
 /*
  * Copyright (C) 2023, STMicroelectronics - All Rights Reserved
  */
+
+/omit-if-no-ref/ &usart2_pins_a;

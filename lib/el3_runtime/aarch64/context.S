@@ -350,45 +350,6 @@ endfunc fpregs_context_restore
 #endif /* ENABLE_FEAT_DIT */
 	.endm /* set_unset_pstate_bits */
 
-/*-------------------------------------------------------------------------
- * This macro checks the ENABLE_FEAT_MPAM state, performs ID register
- * check to see if the platform supports MPAM extension and restores MPAM3
- * register value if it is FEAT_STATE_ENABLED/FEAT_STATE_CHECKED.
- *
- * This is particularly more complicated because we can't check
- * if the platform supports MPAM  by looking for status of a particular bit
- * in the MDCR_EL3 or CPTR_EL3 register like other extensions.
- * ------------------------------------------------------------------------
- */
-
-	.macro	restore_mpam3_el3
-#if ENABLE_FEAT_MPAM
-#if ENABLE_FEAT_MPAM == 2
-
-	mrs x8, id_aa64pfr0_el1
-	lsr x8, x8, #(ID_AA64PFR0_MPAM_SHIFT)
-	and x8, x8, #(ID_AA64PFR0_MPAM_MASK)
-	mrs x7, id_aa64pfr1_el1
-	lsr x7, x7, #(ID_AA64PFR1_MPAM_FRAC_SHIFT)
-	and x7, x7, #(ID_AA64PFR1_MPAM_FRAC_MASK)
-	orr x7, x7, x8
-	cbz x7, no_mpam
-#endif
-	/* -----------------------------------------------------------
-	 * Restore MPAM3_EL3 register as per context state
-	 * Currently we only enable MPAM for NS world and trap to EL3
-	 * for MPAM access in lower ELs of Secure and Realm world
-	 * x9 holds address of the per_world context
-	 * -----------------------------------------------------------
-	 */
-
-	ldr	x17, [x9, #CTX_MPAM3_EL3]
-	msr	S3_6_C10_C5_0, x17 /* mpam3_el3 */
-
-no_mpam:
-#endif
-	.endm /* restore_mpam3_el3 */
-
 /* ------------------------------------------------------------------
  * The following macro is used to save and restore all the general
  * purpose and ARMv8.3-PAuth (if enabled) registers.
@@ -572,25 +533,6 @@ func save_and_update_ptw_el1_sys_regs
 	ret
 endfunc save_and_update_ptw_el1_sys_regs
 
-/* -----------------------------------------------------------------
-* The below macro returns the address of the per_world context for
-* the security state, retrieved through "get_security_state" macro.
-* The per_world context address is returned in the register argument.
-* Clobbers: x9, x10
-* ------------------------------------------------------------------
-*/
-
-.macro get_per_world_context _reg:req
-	ldr 	x10, [sp, #CTX_EL3STATE_OFFSET + CTX_SCR_EL3]
-	get_security_state x9, x10
-	mov_imm	x10, (CTX_PERWORLD_EL3STATE_END - CTX_CPTR_EL3)
-	mul	x9, x9, x10
-	adrp	x10, per_world_context
-	add	x10, x10, :lo12:per_world_context
-	add	x9, x9, x10
-	mov 	\_reg, x9
-.endm
-
 /* ------------------------------------------------------------------
  * This routine assumes that the SP_EL3 is pointing to a valid
  * context structure from where the gp regs and other special
@@ -621,11 +563,7 @@ func el3_exit
 	 * Synchronization is required before zcr_el3 is addressed.
 	 * ----------------------------------------------------------
 	 */
-
-	/* The address of the per_world context is stored in x9 */
-	get_per_world_context x9
-
-	ldp	x19, x20, [x9, #CTX_CPTR_EL3]
+	ldp	x19, x20, [sp, #CTX_EL3STATE_OFFSET + CTX_CPTR_EL3]
 	msr	cptr_el3, x19
 
 #if IMAGE_BL31
@@ -635,9 +573,6 @@ func el3_exit
 	isb
 	msr	S3_6_C1_C2_0, x20 /* zcr_el3 */
 sve_not_enabled:
-
-	restore_mpam3_el3
-
 #endif /* IMAGE_BL31 */
 
 #if IMAGE_BL31 && DYNAMIC_WORKAROUND_CVE_2018_3639
@@ -651,9 +586,23 @@ sve_not_enabled:
 1:
 #endif /* IMAGE_BL31 && DYNAMIC_WORKAROUND_CVE_2018_3639 */
 
-#if IMAGE_BL31
-	synchronize_errors
-#endif /* IMAGE_BL31 */
+/*
+ * This is a hot path, so we don't want to do some actual FEAT_RAS runtime
+ * detection here. The "esb" is a cheaper variant, so using "dsb" in the
+ * ENABLE_FEAT_RAS==2 case is not ideal, but won't hurt.
+ */
+#if IMAGE_BL31 && ENABLE_FEAT_RAS == 1
+	/* ----------------------------------------------------------
+	 * Issue Error Synchronization Barrier to synchronize SErrors
+	 * before exiting EL3. We're running with EAs unmasked, so
+	 * any synchronized errors would be taken immediately;
+	 * therefore no need to inspect DISR_EL1 register.
+ 	 * ----------------------------------------------------------
+	 */
+	esb
+#else
+	dsb	sy
+#endif /* IMAGE_BL31 && ENABLE_FEAT_RAS */
 
 	/* ----------------------------------------------------------
 	 * Restore SPSR_EL3, ELR_EL3 and SCR_EL3 prior to ERET
@@ -677,8 +626,7 @@ sve_not_enabled:
 	ldr	x30, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_LR]
 
 #ifdef IMAGE_BL31
-	/* Clear the EL3 flag as we are exiting el3 */
-	str	xzr, [sp, #CTX_EL3STATE_OFFSET + CTX_NESTED_EA_FLAG]
+	str	xzr, [sp, #CTX_EL3STATE_OFFSET + CTX_IS_IN_EL3]
 #endif /* IMAGE_BL31 */
 
 	exception_return

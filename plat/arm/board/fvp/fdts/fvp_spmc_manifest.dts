@@ -20,7 +20,7 @@
 	attribute {
 		spmc_id = <0x8000>;
 		maj_ver = <0x1>;
-		min_ver = <0x2>;
+		min_ver = <0x1>;
 		exec_state = <0x0>;
 		load_address = <0x0 0x6000000>;
 		entrypoint = <0x0 0x6000000>;
@@ -35,11 +35,6 @@
 			load_address = <0x7000000>;
 			vcpu_count = <8>;
 			mem_size = <1048576>;
-			/*
-			 * Platform specific SiP SMC call handled at EL3. Used
-			 * to pend an interrupt for testing purpose.
-			 */
-			smc_whitelist = <0x82000100>;
 		};
 		vm2 {
 			is_ffa_partition;

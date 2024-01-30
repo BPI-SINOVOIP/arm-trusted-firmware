@@ -55,9 +55,6 @@ SECTIONS {
 
 #if SEPARATE_CODE_AND_RODATA
     .text . : {
-        ASSERT(. == ALIGN(PAGE_SIZE),
-        ".text address is not aligned on a page boundary.");
-
         __TEXT_START__ = .;
         __TEXT_RESIDENT_START__ = .;
 
@@ -92,9 +89,6 @@ SECTIONS {
         "Resident part of BL2 has exceeded its limit.")
 #else /* SEPARATE_CODE_AND_RODATA */
     .ro . : {
-        ASSERT(. == ALIGN(PAGE_SIZE),
-        ".ro address is not aligned on a page boundary.");
-
         __RO_START__ = .;
         __TEXT_RESIDENT_START__ = .;
 

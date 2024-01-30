@@ -33,7 +33,6 @@
 
 #define SOCFPGA_RSTMGR_REG_BASE			0xffd11000
 #define SOCFPGA_SYSMGR_REG_BASE			0xffd12000
-#define SOCFPGA_ECC_QSPI_REG_BASE				0xffa22000
 
 #define SOCFPGA_L4_PER_SCR_REG_BASE		0xffd21000
 #define SOCFPGA_L4_SYS_SCR_REG_BASE		0xffd21100
@@ -65,7 +64,7 @@
 #define DEVICE4_SIZE				(0x0100000000)
 
 #define BL2_BASE		(0xffe00000)
-#define BL2_LIMIT		(0xffe2b000)
+#define BL2_LIMIT		(0xffe1b000)
 
 #define BL31_BASE		(0x1000)
 #define BL31_LIMIT		(0x81000)
@@ -77,11 +76,6 @@
 #define PLAT_UART1_BASE		(0xFFC02100)
 
 /*******************************************************************************
- * WDT related constants
- ******************************************************************************/
-#define WDT_BASE			(0xFFD00200)
-
-/*******************************************************************************
  * GIC related constants
  ******************************************************************************/
 #define PLAT_GIC_BASE			(0xFFFC0000)
@@ -89,7 +83,7 @@
 #define PLAT_GICD_BASE			(PLAT_GIC_BASE + 0x1000)
 #define PLAT_GICR_BASE			0
 
-#define PLAT_SYS_COUNTER_FREQ_IN_TICKS	(get_mpu_periph_clk() * PLAT_HZ_CONVERT_TO_MHZ)
+#define PLAT_SYS_COUNTER_FREQ_IN_TICKS	(400000000)
 #define PLAT_HZ_CONVERT_TO_MHZ	(1000000)
 
 /*******************************************************************************
@@ -105,7 +99,7 @@
 #define L2_RESET_DONE_REG			0xFFD12218
 
 /* Platform specific system counter */
-#define PLAT_SYS_COUNTER_FREQ_IN_MHZ	get_mpu_periph_clk()
+#define PLAT_SYS_COUNTER_FREQ_IN_MHZ	get_cpu_clk()
 
 #endif /* PLATSOCFPGA_DEF_H */
 

@@ -7,6 +7,7 @@
 #ifndef SOCFPGA_PRIVATE_H
 #define SOCFPGA_PRIVATE_H
 
+#include "socfpga_plat_def.h"
 
 #define EMMC_DESC_SIZE		(1<<20)
 

@@ -23,8 +23,7 @@ static inline uint64_t get_mem_client_mode(uint64_t size)
 }
 
 /*******************************************************************************
- * This function inserts Platform information and firmware versions
- * via device tree nodes as,
+ * This function inserts Platform information via device tree nodes as,
  *	platform-info {
  *		local-ddr-size = <0x0 0x0>;
  *#ifdef TARGET_PLATFORM_SOC
@@ -34,22 +33,12 @@ static inline uint64_t get_mem_client_mode(uint64_t size)
  *		scc-config = <0x0>;
  *#endif
  *	};
- *	firmware-version {
- *#ifdef TARGET_PLATFORM_SOC
- *		mcc-fw-version = <0x0>;
- *		pcc-fw-version = <0x0>;
- *#endif
- *		scp-fw-version = <0x0>;
- *		scp-fw-commit = <0x0>;
- *		tfa-fw-version = "unknown-dirty_00000000";
- *	};
  ******************************************************************************/
-static int plat_morello_append_config_node(struct morello_plat_info *plat_info,
-				struct morello_firmware_version *fw_version)
+static int plat_morello_append_config_node(struct morello_plat_info *plat_info)
 {
 	bl_mem_params_node_t *mem_params;
 	void *fdt;
-	int nodeoffset_plat, nodeoffset_fw, err;
+	int nodeoffset, err;
 	uint64_t usable_mem_size;
 
 	usable_mem_size = plat_info->local_ddr_size;
@@ -68,41 +57,35 @@ static int plat_morello_append_config_node(struct morello_plat_info *plat_info,
 		return -1;
 	}
 
-	nodeoffset_plat = fdt_subnode_offset(fdt, 0, "platform-info");
-	if (nodeoffset_plat < 0) {
+	nodeoffset = fdt_subnode_offset(fdt, 0, "platform-info");
+	if (nodeoffset < 0) {
 		ERROR("NT_FW_CONFIG: Failed to get platform-info node offset\n");
 		return -1;
 	}
 
-	nodeoffset_fw = fdt_subnode_offset(fdt, 0, "firmware-version");
-	if (nodeoffset_fw < 0) {
-		ERROR("NT_FW_CONFIG: Failed to get firmware-version node offset\n");
-		return -1;
-	}
-
 #ifdef TARGET_PLATFORM_SOC
-	err = fdt_setprop_u64(fdt, nodeoffset_plat, "remote-ddr-size",
+	err = fdt_setprop_u64(fdt, nodeoffset, "remote-ddr-size",
 			plat_info->remote_ddr_size);
 	if (err < 0) {
 		ERROR("NT_FW_CONFIG: Failed to set remote-ddr-size\n");
 		return -1;
 	}
 
-	err = fdt_setprop_u32(fdt, nodeoffset_plat, "remote-chip-count",
+	err = fdt_setprop_u32(fdt, nodeoffset, "remote-chip-count",
 			plat_info->remote_chip_count);
 	if (err < 0) {
 		ERROR("NT_FW_CONFIG: Failed to set remote-chip-count\n");
 		return -1;
 	}
 
-	err = fdt_setprop_u32(fdt, nodeoffset_plat, "multichip-mode",
+	err = fdt_setprop_u32(fdt, nodeoffset, "multichip-mode",
 			plat_info->multichip_mode);
 	if (err < 0) {
 		ERROR("NT_FW_CONFIG: Failed to set multichip-mode\n");
 		return -1;
 	}
 
-	err = fdt_setprop_u32(fdt, nodeoffset_plat, "scc-config",
+	err = fdt_setprop_u32(fdt, nodeoffset, "scc-config",
 			plat_info->scc_config);
 	if (err < 0) {
 		ERROR("NT_FW_CONFIG: Failed to set scc-config\n");
@@ -112,41 +95,8 @@ static int plat_morello_append_config_node(struct morello_plat_info *plat_info,
 	if (plat_info->scc_config & MORELLO_SCC_CLIENT_MODE_MASK) {
 		usable_mem_size = get_mem_client_mode(plat_info->local_ddr_size);
 	}
-
-	err = fdt_setprop_u32(fdt, nodeoffset_fw, "mcc-fw-version",
-			fw_version->mcc_fw_ver);
-	if (err < 0) {
-		ERROR("NT_FW_CONFIG: Failed to set mcc-fw-version\n");
-		return -1;
-	}
-
-	err = fdt_setprop_u32(fdt, nodeoffset_fw, "pcc-fw-version",
-			fw_version->pcc_fw_ver);
-	if (err < 0) {
-		ERROR("NT_FW_CONFIG: Failed to set pcc-fw-version\n");
-		return -1;
-	}
 #endif
-	err = fdt_setprop_u32(fdt, nodeoffset_fw, "scp-fw-version",
-			fw_version->scp_fw_ver);
-	if (err < 0) {
-		ERROR("NT_FW_CONFIG: Failed to set scp-fw-version\n");
-		return -1;
-	}
-
-	err = fdt_setprop_u32(fdt, nodeoffset_fw, "scp-fw-commit",
-			fw_version->scp_fw_commit);
-	if (err < 0) {
-		ERROR("NT_FW_CONFIG: Failed to set scp-fw-commit\n");
-		return -1;
-	}
-
-	err = fdt_setprop_string(fdt, nodeoffset_fw, "tfa-fw-version", version_string);
-	if (err < 0) {
-		WARN("NT_FW_CONFIG: Unable to set tfa-fw-version\n");
-	}
-
-	err = fdt_setprop_u64(fdt, nodeoffset_plat, "local-ddr-size",
+	err = fdt_setprop_u64(fdt, nodeoffset, "local-ddr-size",
 			usable_mem_size);
 	if (err < 0) {
 		ERROR("NT_FW_CONFIG: Failed to set local-ddr-size\n");
@@ -165,7 +115,6 @@ bl_params_t *plat_get_next_bl_params(void)
 {
 	int ret;
 	struct morello_plat_info plat_info;
-	struct morello_firmware_version fw_version;
 
 	ret = sds_init();
 	if (ret != SDS_OK) {
@@ -183,16 +132,6 @@ bl_params_t *plat_get_next_bl_params(void)
 		panic();
 	}
 
-	ret = sds_struct_read(MORELLO_SDS_FIRMWARE_VERSION_STRUCT_ID,
-				MORELLO_SDS_FIRMWARE_VERSION_OFFSET,
-				&fw_version,
-				MORELLO_SDS_FIRMWARE_VERSION_SIZE,
-				SDS_ACCESS_MODE_NON_CACHED);
-	if (ret != SDS_OK) {
-		ERROR("Error getting firmware version from SDS. ret:%d\n", ret);
-		panic();
-	}
-
 	/* Validate plat_info SDS */
 #ifdef TARGET_PLATFORM_FVP
 	if (plat_info.local_ddr_size == 0U) {
@@ -207,7 +146,7 @@ bl_params_t *plat_get_next_bl_params(void)
 		panic();
 	}
 
-	ret = plat_morello_append_config_node(&plat_info, &fw_version);
+	ret = plat_morello_append_config_node(&plat_info);
 	if (ret != 0) {
 		panic();
 	}

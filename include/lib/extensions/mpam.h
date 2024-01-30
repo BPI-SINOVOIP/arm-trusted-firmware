@@ -9,18 +9,16 @@
 
 #include <stdbool.h>
 
-#include <context.h>
-
-#if ENABLE_FEAT_MPAM
-void mpam_enable_per_world(per_world_context_t *per_world_ctx);
+#if ENABLE_MPAM_FOR_LOWER_ELS
+void mpam_init_el3(void);
 void mpam_init_el2_unused(void);
 #else
-static inline void mpam_enable_per_world(per_world_context_t *per_world_ctx)
+static inline void mpam_init_el3(void)
 {
 }
 static inline void mpam_init_el2_unused(void)
 {
 }
-#endif /* ENABLE_FEAT_MPAM */
+#endif /* ENABLE_MPAM_FOR_LOWER_ELS */
 
 #endif /* MPAM_H */

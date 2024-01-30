@@ -69,9 +69,6 @@ ifdef XILINX_OF_BOARD_DTB_ADDR
 $(eval $(call add_define,XILINX_OF_BOARD_DTB_ADDR))
 endif
 
-# enable assert() for release/debug builds
-ENABLE_ASSERTIONS := 1
-
 PLAT_INCLUDES		:=	-Iinclude/plat/arm/common/			\
 				-Iplat/xilinx/common/include/			\
 				-Iplat/xilinx/common/ipi_mailbox_service/	\
@@ -93,9 +90,7 @@ PLAT_BL_COMMON_SOURCES	:=	\
 				plat/arm/common/arm_common.c			\
 				plat/common/plat_gicv3.c			\
 				${PLAT_PATH}/aarch64/versal_net_helpers.S	\
-				${PLAT_PATH}/aarch64/versal_net_common.c	\
-				${PLAT_PATH}/plat_topology.c                    \
-				${XLAT_TABLES_LIB_SRCS}
+				${PLAT_PATH}/aarch64/versal_net_common.c
 
 BL31_SOURCES		+=	drivers/arm/cci/cci.c				\
 				lib/cpus/aarch64/cortex_a78_ae.S		\
@@ -118,8 +113,10 @@ BL31_SOURCES		+=	plat/xilinx/common/plat_fdt.c			\
 				plat/xilinx/common/ipi_mailbox_service/ipi_mailbox_svc.c \
 				plat/xilinx/common/versal.c			\
 				${PLAT_PATH}/bl31_versal_net_setup.c		\
+				${PLAT_PATH}/plat_topology.c			\
 				common/fdt_fixup.c				\
 				common/fdt_wrappers.c				\
 				${LIBFDT_SRCS}					\
 				${PLAT_PATH}/sip_svc_setup.c			\
-				${PLAT_PATH}/versal_net_gicv3.c
+				${PLAT_PATH}/versal_net_gicv3.c			\
+				${XLAT_TABLES_LIB_SRCS}

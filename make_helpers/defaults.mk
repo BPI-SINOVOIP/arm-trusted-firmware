@@ -150,10 +150,6 @@ HANDLE_EA_EL3_FIRST_NS		:= 0
 # Enable Handoff protocol using transfer lists
 TRANSFER_LIST			:= 0
 
-# Enables support for the gcc compiler option "-mharden-sls=all".
-# By default, disables all SLS hardening.
-HARDEN_SLS			:= 0
-
 # Secure hash algorithm flag, accepts 3 values: sha256, sha384 and sha512.
 # The default value is sha256.
 HASH_ALG			:= sha256
@@ -194,6 +190,9 @@ PSCI_EXTENDED_STATE_ID		:= 0
 
 # Enable PSCI OS-initiated mode support
 PSCI_OS_INIT_MODE		:= 0
+
+# Enable RAS Firmware First Handling Support
+RAS_FFH_SUPPORT			:= 0
 
 # By default, BL1 acts as the reset handler, not BL31
 RESET_TO_BL31			:= 0
@@ -351,6 +350,9 @@ NR_OF_IMAGES_IN_FW_BANK		:= 1
 # Disable Firmware update support by default
 PSA_FWU_SUPPORT			:= 0
 
+# By default, disable the mocking of RSS provided services
+PLAT_RSS_NOT_SUPPORTED		:= 0
+
 # Dynamic Root of Trust for Measurement support
 DRTM_SUPPORT			:= 0
 
@@ -368,13 +370,3 @@ PSA_CRYPTO			:= 0
 # Disabled by default because it constitutes an attack vector into TF-A. It
 # should only be enabled if there is a use case for it.
 ENABLE_CONSOLE_GETC		:= 0
-
-# Build option to disable EL2 when it is not used.
-# Most platforms switch from EL3 to NS-EL2 and hence the unused NS-EL2
-# functions must be enabled by platforms if they require it.
-# Disabled by default.
-INIT_UNUSED_NS_EL2		:= 0
-
-# Disable including MPAM EL2 registers in context by default since currently
-# it's only enabled for NS world
-CTX_INCLUDE_MPAM_REGS		:= 0

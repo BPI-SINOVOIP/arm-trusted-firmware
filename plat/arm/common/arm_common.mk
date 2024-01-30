@@ -164,9 +164,22 @@ ifeq ($(SEPARATE_NOBITS_REGION),1)
     endif
 endif
 
+# Disable ARM Cryptocell by default
+ARM_CRYPTOCELL_INTEG		:=	0
+$(eval $(call assert_boolean,ARM_CRYPTOCELL_INTEG))
+$(eval $(call add_define,ARM_CRYPTOCELL_INTEG))
+
 # Enable PIE support for RESET_TO_BL31/RESET_TO_SP_MIN case
 ifneq ($(filter 1,${RESET_TO_BL31} ${RESET_TO_SP_MIN}),)
 	ENABLE_PIE			:=	1
+endif
+
+# CryptoCell integration relies on coherent buffers for passing data from
+# the AP CPU to the CryptoCell
+ifeq (${ARM_CRYPTOCELL_INTEG},1)
+    ifeq (${USE_COHERENT_MEM},0)
+        $(error "ARM_CRYPTOCELL_INTEG needs USE_COHERENT_MEM to be set.")
+    endif
 endif
 
 # Disable GPT parser support, use FIP image by default
@@ -318,11 +331,9 @@ endif
 ifeq (${ARCH}, aarch64)
 BL31_SOURCES		+=	plat/arm/common/aarch64/execution_state_switch.c\
 				plat/arm/common/arm_sip_svc.c			\
-				plat/arm/common/plat_arm_sip_svc.c		\
 				${ARM_SVC_HANDLER_SRCS}
 else
 BL32_SOURCES		+=	plat/arm/common/arm_sip_svc.c			\
-				plat/arm/common/plat_arm_sip_svc.c		\
 				${ARM_SVC_HANDLER_SRCS}
 endif
 endif
@@ -339,7 +350,7 @@ endif
 endif
 
 # RAS sources
-ifeq (${ENABLE_FEAT_RAS}-${HANDLE_EA_EL3_FIRST_NS},1-1)
+ifeq (${RAS_FFH_SUPPORT},1)
 BL31_SOURCES		+=	lib/extensions/ras/std_err_record.c		\
 				lib/extensions/ras/ras_common.c
 endif
@@ -434,7 +445,11 @@ ifneq ($(filter 1,${MEASURED_BOOT} ${TRUSTED_BOARD_BOOT} ${DRTM_SUPPORT}),)
     BL31_SOURCES	+=	drivers/auth/crypto_mod.c
 
     # We expect to locate the *.mk files under the directories specified below
-    CRYPTO_LIB_MK := drivers/auth/mbedtls/mbedtls_crypto.mk
+    ifeq (${ARM_CRYPTOCELL_INTEG},0)
+        CRYPTO_LIB_MK := drivers/auth/mbedtls/mbedtls_crypto.mk
+    else
+        CRYPTO_LIB_MK := drivers/auth/cryptocell/cryptocell_crypto.mk
+    endif
 
     $(info Including ${CRYPTO_LIB_MK})
     include ${CRYPTO_LIB_MK}

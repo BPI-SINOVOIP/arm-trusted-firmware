@@ -8,8 +8,8 @@
 # Trusted Firmware Version
 #
 VERSION_MAJOR			:= 2
-VERSION_MINOR			:= 10
-VERSION_PATCH			:= 0	# Only used for LTS releases
+VERSION_MINOR			:= 9
+VERSION_PATCH			:= 0
 VERSION				:= ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}
 
 # Default goal is build all images
@@ -41,6 +41,10 @@ PLAT				:= ${DEFAULT_PLAT}
 
 CHECKCODE_ARGS		:=	--no-patch
 # Do not check the coding style on imported library files or documentation files
+INC_ARM_DIRS_TO_CHECK	:=	$(sort $(filter-out                     \
+					include/drivers/arm/cryptocell,	\
+					$(wildcard include/drivers/arm/*)))
+INC_ARM_DIRS_TO_CHECK	+=	include/drivers/arm/cryptocell/*.h
 INC_DRV_DIRS_TO_CHECK	:=	$(sort $(filter-out			\
 					include/drivers/arm,		\
 					$(wildcard include/drivers/*)))
@@ -308,10 +312,6 @@ WARNINGS	+=		-Wunused-but-set-variable -Wmaybe-uninitialized	\
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=105523
 TF_CFLAGS		+= 	$(call cc_option, --param=min-pagesize=0)
 
-ifeq ($(HARDEN_SLS), 1)
-        TF_CFLAGS_aarch64       +=      $(call cc_option, -mharden-sls=all)
-endif
-
 else
 # using clang
 WARNINGS	+=		-Wshift-overflow -Wshift-sign-overflow \
@@ -361,7 +361,6 @@ else ifneq ($(findstring gcc,$(notdir $(LD))),)
 
 	TF_LDFLAGS		+=	-Wl,-z,common-page-size=4096 #Configure page size constants
 	TF_LDFLAGS		+=	-Wl,-z,max-page-size=4096
-	TF_LDFLAGS		+=	-Wl,--build-id=none
 
 	ifeq ($(ENABLE_LTO),1)
 		ifeq (${ARCH},aarch64)
@@ -371,10 +370,8 @@ else ifneq ($(findstring gcc,$(notdir $(LD))),)
 
 # GCC automatically adds fix-cortex-a53-843419 flag when used to link
 # which breaks some builds, so disable if errata fix is not explicitly enabled
-	ifeq (${ARCH},aarch64)
-		ifneq (${ERRATA_A53_843419},1)
-			TF_LDFLAGS	+= 	-mno-fix-cortex-a53-843419
-		endif
+	ifneq (${ERRATA_A53_843419},1)
+		TF_LDFLAGS	+= 	-mno-fix-cortex-a53-843419
 	endif
 	TF_LDFLAGS		+= 	-nostdlib
 	TF_LDFLAGS		+=	$(subst --,-Xlinker --,$(TF_LDFLAGS_$(ARCH)))
@@ -389,7 +386,6 @@ else
 
 	TF_LDFLAGS		+=	-z common-page-size=4096 # Configure page size constants
 	TF_LDFLAGS		+=	-z max-page-size=4096
-	TF_LDFLAGS		+=	--build-id=none
 
 # ld.lld doesn't recognize the errata flags,
 # therefore don't add those in that case.
@@ -400,6 +396,10 @@ else
 	endif
 
 endif #(LD = armlink)
+
+DTC_FLAGS		+=	-I dts -O dtb
+DTC_CPPFLAGS		+=	-P -nostdinc -Iinclude -Ifdts -undef \
+				-x assembler-with-cpp $(DEFINES)
 
 ################################################################################
 # Setup ARCH_MAJOR/MINOR before parsing arch_features.
@@ -412,6 +412,7 @@ endif
 ################################################################################
 # Common sources and include directories
 ################################################################################
+include ${MAKE_HELPERS_DIRECTORY}arch_features.mk
 include lib/compiler-rt/compiler-rt.mk
 
 BL_COMMON_SOURCES	+=	common/bl_common.c			\
@@ -442,11 +443,105 @@ INCLUDES		+=	-Iinclude				\
 				${PLAT_INCLUDES}			\
 				${SPD_INCLUDES}
 
-DTC_FLAGS		+=	-I dts -O dtb
-DTC_CPPFLAGS		+=	-P -nostdinc $(INCLUDES) -Ifdts -undef \
-				-x assembler-with-cpp $(DEFINES)
-
 include common/backtrace/backtrace.mk
+
+################################################################################
+# Process BRANCH_PROTECTION value and set
+# Pointer Authentication and Branch Target Identification flags
+################################################################################
+ifeq (${BRANCH_PROTECTION},0)
+	# Default value turns off all types of branch protection
+	BP_OPTION := none
+else ifneq (${ARCH},aarch64)
+        $(error BRANCH_PROTECTION requires AArch64)
+else ifeq (${BRANCH_PROTECTION},1)
+	# Enables all types of branch protection features
+	BP_OPTION := standard
+	ENABLE_BTI := 1
+	ENABLE_PAUTH := 1
+else ifeq (${BRANCH_PROTECTION},2)
+	# Return address signing to its standard level
+	BP_OPTION := pac-ret
+	ENABLE_PAUTH := 1
+else ifeq (${BRANCH_PROTECTION},3)
+	# Extend the signing to include leaf functions
+	BP_OPTION := pac-ret+leaf
+	ENABLE_PAUTH := 1
+else ifeq (${BRANCH_PROTECTION},4)
+	# Turn on branch target identification mechanism
+	BP_OPTION := bti
+	ENABLE_BTI := 1
+else
+        $(error Unknown BRANCH_PROTECTION value ${BRANCH_PROTECTION})
+endif #(BRANCH_PROTECTION)
+
+ifeq ($(ENABLE_PAUTH),1)
+	CTX_INCLUDE_PAUTH_REGS := 1
+endif
+ifneq (${BP_OPTION},none)
+	TF_CFLAGS_aarch64	+=	-mbranch-protection=${BP_OPTION}
+endif #(BP_OPTION)
+
+# Pointer Authentication sources
+ifeq (${ENABLE_PAUTH}, 1)
+# arm/common/aarch64/arm_pauth.c contains a sample platform hook to complete the
+# Pauth support. As it's not secure, it must be reimplemented for real platforms
+	BL_COMMON_SOURCES	+=	lib/extensions/pauth/pauth_helpers.S
+endif
+
+####################################################
+# Enable required options for Memory Stack Tagging.
+####################################################
+
+# Currently, these options are enabled only for clang and armclang compiler.
+ifeq (${SUPPORT_STACK_MEMTAG},yes)
+    ifdef mem_tag_arch_support
+        # Check for armclang and clang compilers
+        ifneq ( ,$(filter $(notdir $(CC)),armclang clang))
+        # Add "memtag" architecture feature modifier if not specified
+            ifeq ( ,$(findstring memtag,$(arch-features)))
+                arch-features	:=	$(arch-features)+memtag
+            endif	# memtag
+            ifeq ($(notdir $(CC)),armclang)
+                TF_CFLAGS	+=	-mmemtag-stack
+            else ifeq ($(notdir $(CC)),clang)
+                TF_CFLAGS	+=	-fsanitize=memtag
+            endif	# armclang
+        endif
+    else
+        $(error "Error: stack memory tagging is not supported for  \
+        architecture ${ARCH},armv${ARM_ARCH_MAJOR}.${ARM_ARCH_MINOR}-a")
+	endif #(mem_tag_arch_support)
+endif #(SUPPORT_STACK_MEMTAG)
+
+################################################################################
+# RME dependent flags configuration, Enable optional features for RME.
+################################################################################
+# FEAT_RME
+ifeq (${ENABLE_RME},1)
+	# RME doesn't support PIE
+	ifneq (${ENABLE_PIE},0)
+                $(error ENABLE_RME does not support PIE)
+	endif
+
+	# RME doesn't support BRBE
+	ifneq (${ENABLE_BRBE_FOR_NS},0)
+                $(error ENABLE_RME does not support BRBE.)
+	endif
+
+	# RME requires AARCH64
+	ifneq (${ARCH},aarch64)
+                $(error ENABLE_RME requires AArch64)
+	endif
+
+	# RME requires el2 context to be saved for now.
+	CTX_INCLUDE_EL2_REGS := 1
+	CTX_INCLUDE_AARCH32_REGS := 0
+	CTX_INCLUDE_PAUTH_REGS := 1
+
+	# RME enables CSV2_2 extension by default.
+	ENABLE_FEAT_CSV2_2 = 1
+endif #(FEAT_RME)
 
 ################################################################################
 # Generic definitions
@@ -544,118 +639,14 @@ ifeq ($(SPMC_AT_EL3),1)
 endif
 endif
 
-################################################################################
-# Process BRANCH_PROTECTION value and set
-# Pointer Authentication and Branch Target Identification flags
-################################################################################
-ifeq (${BRANCH_PROTECTION},0)
-	# Default value turns off all types of branch protection
-	BP_OPTION := none
-else ifneq (${ARCH},aarch64)
-        $(error BRANCH_PROTECTION requires AArch64)
-else ifeq (${BRANCH_PROTECTION},1)
-	# Enables all types of branch protection features
-	BP_OPTION := standard
-	ENABLE_BTI := 1
-	ENABLE_PAUTH := 1
-else ifeq (${BRANCH_PROTECTION},2)
-	# Return address signing to its standard level
-	BP_OPTION := pac-ret
-	ENABLE_PAUTH := 1
-else ifeq (${BRANCH_PROTECTION},3)
-	# Extend the signing to include leaf functions
-	BP_OPTION := pac-ret+leaf
-	ENABLE_PAUTH := 1
-else ifeq (${BRANCH_PROTECTION},4)
-	# Turn on branch target identification mechanism
-	BP_OPTION := bti
-	ENABLE_BTI := 1
-else
-        $(error Unknown BRANCH_PROTECTION value ${BRANCH_PROTECTION})
-endif #(BRANCH_PROTECTION)
-
-ifeq ($(ENABLE_PAUTH),1)
-	CTX_INCLUDE_PAUTH_REGS := 1
+ifeq (${CTX_INCLUDE_EL2_REGS}, 1)
+	ifeq (${SPD},none)
+		ifeq (${ENABLE_RME},0)
+                        $(error CTX_INCLUDE_EL2_REGS is available only when SPD \
+                        or RME is enabled)
+		endif
+	endif
 endif
-ifneq (${BP_OPTION},none)
-	TF_CFLAGS_aarch64	+=	-mbranch-protection=${BP_OPTION}
-endif #(BP_OPTION)
-
-# Pointer Authentication sources
-ifeq (${ENABLE_PAUTH}, 1)
-# arm/common/aarch64/arm_pauth.c contains a sample platform hook to complete the
-# Pauth support. As it's not secure, it must be reimplemented for real platforms
-	BL_COMMON_SOURCES	+=	lib/extensions/pauth/pauth_helpers.S
-endif
-
-################################################################################
-# Include the platform specific Makefile after the SPD Makefile (the platform
-# makefile may use all previous definitions in this file)
-################################################################################
-include ${PLAT_MAKEFILE_FULL}
-
-################################################################################
-# Setup arch_features based on ARM_ARCH_MAJOR, ARM_ARCH_MINOR provided from
-# platform.
-################################################################################
-include ${MAKE_HELPERS_DIRECTORY}arch_features.mk
-
-####################################################
-# Enable required options for Memory Stack Tagging.
-####################################################
-
-# Currently, these options are enabled only for clang and armclang compiler.
-ifeq (${SUPPORT_STACK_MEMTAG},yes)
-    ifdef mem_tag_arch_support
-        # Check for armclang and clang compilers
-        ifneq ( ,$(filter $(notdir $(CC)),armclang clang))
-        # Add "memtag" architecture feature modifier if not specified
-            ifeq ( ,$(findstring memtag,$(arch-features)))
-                arch-features	:=	$(arch-features)+memtag
-            endif	# memtag
-            ifeq ($(notdir $(CC)),armclang)
-                TF_CFLAGS	+=	-mmemtag-stack
-            else ifeq ($(notdir $(CC)),clang)
-                TF_CFLAGS	+=	-fsanitize=memtag
-            endif	# armclang
-        endif
-    else
-        $(error "Error: stack memory tagging is not supported for  \
-        architecture ${ARCH},armv${ARM_ARCH_MAJOR}.${ARM_ARCH_MINOR}-a")
-	endif #(mem_tag_arch_support)
-endif #(SUPPORT_STACK_MEMTAG)
-
-################################################################################
-# RME dependent flags configuration, Enable optional features for RME.
-################################################################################
-# FEAT_RME
-ifeq (${ENABLE_RME},1)
-	# RME doesn't support BRBE
-	ENABLE_BRBE_FOR_NS := 0
-
-	# RME doesn't support PIE
-	ifneq (${ENABLE_PIE},0)
-                $(error ENABLE_RME does not support PIE)
-	endif
-
-	# RME doesn't support BRBE
-	ifneq (${ENABLE_BRBE_FOR_NS},0)
-                $(error ENABLE_RME does not support BRBE.)
-	endif
-
-	# RME requires AARCH64
-	ifneq (${ARCH},aarch64)
-                $(error ENABLE_RME requires AArch64)
-	endif
-
-	# RME requires el2 context to be saved for now.
-	CTX_INCLUDE_EL2_REGS := 1
-	CTX_INCLUDE_AARCH32_REGS := 0
-	CTX_INCLUDE_PAUTH_REGS := 1
-
-	# RME enables CSV2_2 extension by default.
-	ENABLE_FEAT_CSV2_2 = 1
-endif #(FEAT_RME)
 
 ################################################################################
 # Include rmmd Makefile if RME is enabled
@@ -677,14 +668,12 @@ include services/std_svc/rmmd/rmmd.mk
 $(warning "RME is an experimental feature")
 endif
 
-ifeq (${CTX_INCLUDE_EL2_REGS}, 1)
-	ifeq (${SPD},none)
-		ifeq (${ENABLE_RME},0)
-                        $(error CTX_INCLUDE_EL2_REGS is available only when SPD \
-                        or RME is enabled)
-		endif
-	endif
-endif
+################################################################################
+# Include the platform specific Makefile after the SPD Makefile (the platform
+# makefile may use all previous definitions in this file)
+################################################################################
+
+include ${PLAT_MAKEFILE_FULL}
 
 ################################################################################
 # Platform specific Makefile might provide us ARCH_MAJOR/MINOR use that to come
@@ -709,14 +698,6 @@ else ifeq (${ENABLE_RME},1)
 	BL2_RUNS_AT_EL3	:=	1
 else
 	BL2_RUNS_AT_EL3	:=	0
-endif
-
-# This internal flag is set to 1 when Firmware First handling of External aborts
-# is required by lowe ELs. Currently only NS requires this support.
-ifeq ($(HANDLE_EA_EL3_FIRST_NS),1)
-	FFH_SUPPORT := 1
-else
-	FFH_SUPPORT := 0
 endif
 
 $(eval $(call MAKE_PREREQ_DIR,${BUILD_PLAT}))
@@ -880,9 +861,18 @@ endif
 # RAS_EXTENSION is deprecated, provide alternate build options
 ifeq ($(RAS_EXTENSION),1)
         $(error "RAS_EXTENSION is now deprecated, please use ENABLE_FEAT_RAS \
-        and HANDLE_EA_EL3_FIRST_NS instead")
+        and RAS_FFH_SUPPORT instead")
 endif
 
+# RAS firmware first handling requires that EAs are handled in EL3 first
+ifeq ($(RAS_FFH_SUPPORT),1)
+	ifneq ($(ENABLE_FEAT_RAS),1)
+                $(error For RAS_FFH_SUPPORT, ENABLE_FEAT_RAS must also be 1)
+	endif
+	ifneq ($(HANDLE_EA_EL3_FIRST_NS),1)
+                $(error For RAS_FFH_SUPPORT, HANDLE_EA_EL3_FIRST_NS must also be 1)
+	endif
+endif #(RAS_FFH_SUPPORT)
 
 # When FAULT_INJECTION_SUPPORT is used, require that FEAT_RAS is enabled
 ifeq ($(FAULT_INJECTION_SUPPORT),1)
@@ -1170,7 +1160,6 @@ $(eval $(call assert_booleans,\
 	CTX_INCLUDE_AARCH32_REGS \
 	CTX_INCLUDE_FPREGS \
 	CTX_INCLUDE_EL2_REGS \
-	CTX_INCLUDE_MPAM_REGS \
 	DEBUG \
 	DYN_DISABLE_AUTH \
 	EL3_EXCEPTION_HANDLING \
@@ -1185,20 +1174,18 @@ $(eval $(call assert_booleans,\
 	ENABLE_RUNTIME_INSTRUMENTATION \
 	ENABLE_SME_FOR_SWD \
 	ENABLE_SVE_FOR_SWD \
-	ENABLE_FEAT_RAS	\
-	FFH_SUPPORT	\
 	ERROR_DEPRECATED \
 	FAULT_INJECTION_SUPPORT \
 	GENERATE_COT \
 	GICV2_G0_FOR_EL3 \
 	HANDLE_EA_EL3_FIRST_NS \
-	HARDEN_SLS \
 	HW_ASSISTED_COHERENCY \
 	MEASURED_BOOT \
 	DRTM_SUPPORT \
 	NS_TIMER_SWITCH \
 	OVERRIDE_LIBC \
 	PL011_GENERIC_UART \
+	PLAT_RSS_NOT_SUPPORTED \
 	PROGRAMMABLE_RESET_ADDRESS \
 	PSCI_EXTENDED_STATE_ID \
 	PSCI_OS_INIT_MODE \
@@ -1241,9 +1228,9 @@ $(eval $(call assert_booleans,\
 	ERRATA_ABI_SUPPORT \
 	ERRATA_NON_ARM_INTERCONNECT \
 	CONDITIONAL_CMO \
+	RAS_FFH_SUPPORT \
 	PSA_CRYPTO	\
 	ENABLE_CONSOLE_GETC \
-	INIT_UNUSED_NS_EL2	\
 )))
 
 # Numeric_Flags
@@ -1264,6 +1251,7 @@ $(eval $(call assert_numerics,\
 	ENABLE_FEAT_AMU \
 	ENABLE_FEAT_AMUv1p1 \
 	ENABLE_FEAT_CSV2_2 \
+	ENABLE_FEAT_RAS	\
 	ENABLE_FEAT_DIT \
 	ENABLE_FEAT_ECV \
 	ENABLE_FEAT_FGT \
@@ -1280,7 +1268,7 @@ $(eval $(call assert_numerics,\
 	ENABLE_FEAT_GCS \
 	ENABLE_FEAT_VHE \
 	ENABLE_FEAT_MTE_PERM \
-	ENABLE_FEAT_MPAM \
+	ENABLE_MPAM_FOR_LOWER_ELS \
 	ENABLE_RME \
 	ENABLE_SPE_FOR_NS \
 	ENABLE_SYS_REG_TRACE_FOR_NS \
@@ -1321,7 +1309,6 @@ $(eval $(call add_defines,\
 	CTX_INCLUDE_AARCH32_REGS \
 	CTX_INCLUDE_FPREGS \
 	CTX_INCLUDE_PAUTH_REGS \
-	CTX_INCLUDE_MPAM_REGS \
 	EL3_EXCEPTION_HANDLING \
 	CTX_INCLUDE_MTE_REGS \
 	CTX_INCLUDE_EL2_REGS \
@@ -1334,7 +1321,7 @@ $(eval $(call add_defines,\
 	AMU_RESTRICT_COUNTERS \
 	ENABLE_ASSERTIONS \
 	ENABLE_BTI \
-	ENABLE_FEAT_MPAM \
+	ENABLE_MPAM_FOR_LOWER_ELS \
 	ENABLE_PAUTH \
 	ENABLE_PIE \
 	ENABLE_PMF \
@@ -1347,8 +1334,6 @@ $(eval $(call add_defines,\
 	ENABLE_SPE_FOR_NS \
 	ENABLE_SVE_FOR_NS \
 	ENABLE_SVE_FOR_SWD \
-	ENABLE_FEAT_RAS \
-	FFH_SUPPORT \
 	ENCRYPT_BL31 \
 	ENCRYPT_BL32 \
 	ERROR_DEPRECATED \
@@ -1362,9 +1347,12 @@ $(eval $(call add_defines,\
 	NS_TIMER_SWITCH \
 	PL011_GENERIC_UART \
 	PLAT_${PLAT} \
+	PLAT_RSS_NOT_SUPPORTED \
 	PROGRAMMABLE_RESET_ADDRESS \
 	PSCI_EXTENDED_STATE_ID \
 	PSCI_OS_INIT_MODE \
+	ENABLE_FEAT_RAS \
+	RAS_FFH_SUPPORT \
 	RESET_TO_BL31 \
 	SEPARATE_CODE_AND_RODATA \
 	SEPARATE_BL2_NOLOAD_REGION \
@@ -1436,7 +1424,6 @@ $(eval $(call add_defines,\
 	ENABLE_SPMD_LP \
 	PSA_CRYPTO	\
 	ENABLE_CONSOLE_GETC \
-	INIT_UNUSED_NS_EL2	\
 )))
 
 ifeq (${SANITIZE_UB},trap)

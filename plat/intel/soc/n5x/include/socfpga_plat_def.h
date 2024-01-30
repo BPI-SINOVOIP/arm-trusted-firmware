@@ -8,8 +8,8 @@
 #ifndef PLAT_SOCFPGA_DEF_H
 #define PLAT_SOCFPGA_DEF_H
 
-#include <platform_def.h>
 #include "n5x_system_manager.h"
+#include <platform_def.h>
 
 /* Platform Setting */
 #define PLATFORM_MODEL						PLAT_SOCFPGA_N5X
@@ -29,10 +29,11 @@
 /* Register Mapping */
 #define SOCFPGA_CCU_NOC_REG_BASE		U(0xf7000000)
 #define SOCFPGA_F2SDRAMMGR_REG_BASE		U(0xf8024000)
+
 #define SOCFPGA_MMC_REG_BASE			U(0xff808000)
+
 #define SOCFPGA_RSTMGR_REG_BASE			U(0xffd11000)
 #define SOCFPGA_SYSMGR_REG_BASE			U(0xffd12000)
-#define SOCFPGA_ECC_QSPI_REG_BASE				U(0xffa22000)
 
 #define SOCFPGA_L4_PER_SCR_REG_BASE			U(0xffd21000)
 #define SOCFPGA_L4_SYS_SCR_REG_BASE			U(0xffd21100)
@@ -77,11 +78,6 @@
 #define PLAT_UART1_BASE		(0xFFC02100)
 
 /*******************************************************************************
- * WDT related constants
- ******************************************************************************/
-#define WDT_BASE			(0xFFD00200)
-
-/*******************************************************************************
  * GIC related constants
  ******************************************************************************/
 #define PLAT_GIC_BASE			(0xFFFC0000)
@@ -89,7 +85,7 @@
 #define PLAT_GICD_BASE			(PLAT_GIC_BASE + 0x1000)
 #define PLAT_GICR_BASE			0
 
-#define PLAT_SYS_COUNTER_FREQ_IN_TICKS	(get_mpu_periph_clk() * PLAT_HZ_CONVERT_TO_MHZ)
+#define PLAT_SYS_COUNTER_FREQ_IN_TICKS	(400000000)
 #define PLAT_HZ_CONVERT_TO_MHZ	(1000000)
 
 /*******************************************************************************
@@ -105,6 +101,6 @@
 #define L2_RESET_DONE_REG			0xFFD12218
 
 /* Platform specific system counter */
-#define PLAT_SYS_COUNTER_FREQ_IN_MHZ	get_mpu_periph_clk()
+#define PLAT_SYS_COUNTER_FREQ_IN_MHZ	get_cpu_clk()
 
 #endif /* PLAT_SOCFPGA_DEF_H */

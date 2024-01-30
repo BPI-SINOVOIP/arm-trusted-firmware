@@ -32,12 +32,7 @@
  * buffers must be big enough to hold either. As RSA keys are bigger than ECDSA
  * ones for all key sizes we support, they impose the minimum size of these
  * buffers.
- *
- * If the platform employs its own mbedTLS configuration, it is the platform's
- * responsibility to define TF_MBEDTLS_USE_RSA or TF_MBEDTLS_USE_ECDSA to
- * establish the appropriate PK_DER_LEN size.
  */
-#ifdef MBEDTLS_CONFIG_FILE
 #if TF_MBEDTLS_USE_RSA
 #if TF_MBEDTLS_KEY_SIZE == 1024
 #define PK_DER_LEN                      162
@@ -50,7 +45,7 @@
 #else
 #error "Invalid value for TF_MBEDTLS_KEY_SIZE"
 #endif
-#elif TF_MBEDTLS_USE_ECDSA
+#else /* Only using ECDSA keys. */
 #if TF_MBEDTLS_KEY_SIZE == 384
 #define PK_DER_LEN                      120
 #elif TF_MBEDTLS_KEY_SIZE == 256
@@ -58,9 +53,7 @@
 #else
 #error "Invalid value for TF_MBEDTLS_KEY_SIZE"
 #endif
-#else
-#error "Invalid value of algorithm"
-#endif /* TF_MBEDTLS_USE_RSA */
+#endif
 
 #if TF_MBEDTLS_HASH_ALG_ID == TF_MBEDTLS_SHA256
 #define HASH_DER_LEN                    51
@@ -71,6 +64,5 @@
 #else
 #error "Invalid value for TF_MBEDTLS_HASH_ALG_ID"
 #endif
-#endif /* MBEDTLS_CONFIG_FILE */
 
 #endif /* COT_DEF_H */

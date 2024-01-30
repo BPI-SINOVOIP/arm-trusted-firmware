@@ -54,9 +54,6 @@ ifeq (${PLAT_XLAT_TABLES_DYNAMIC},1)
 $(eval $(call add_define,PLAT_XLAT_TABLES_DYNAMIC))
 endif
 
-# enable assert() for release/debug builds
-ENABLE_ASSERTIONS := 1
-
 PLAT_INCLUDES		:=	-Iinclude/plat/arm/common/			\
 				-Iplat/xilinx/common/include/			\
 				-Iplat/xilinx/common/ipi_mailbox_service/	\
@@ -115,10 +112,4 @@ BL31_SOURCES		+=	drivers/arm/cci/cci.c				\
 
 ifeq ($(HARDEN_SLS_ALL), 1)
 TF_CFLAGS_aarch64      +=      -mharden-sls=all
-endif
-
-ifeq (${ERRATA_ABI_SUPPORT}, 1)
-# enable the cpu macros for errata abi interface
-CORTEX_A72_H_INC	:= 1
-$(eval $(call add_define, CORTEX_A72_H_INC))
 endif

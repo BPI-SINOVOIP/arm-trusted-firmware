@@ -67,8 +67,6 @@ LTS Maintainers
 :|G|: `bytefire`_
 :|M|: Varun Wadekar <vwadekar@nvidia.com>
 :|G|: `vwadekar`_
-:|M|: Yann Gautier <yann.gautier@st.com>
-:|G|: `Yann-lms`_
 
 .. _code owners:
 
@@ -759,6 +757,8 @@ Raspberry Pi 4 platform port
 
 Renesas rcar-gen3 platform port
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+:|M|: Jorge Ramirez-Ortiz  <jramirez@baylibre.com>
+:|G|: `ldts`_
 :|M|: Marek Vasut <marek.vasut@gmail.com>
 :|G|: `marex`_
 :|F|: docs/plat/rcar-gen3.rst
@@ -968,6 +968,7 @@ Conventional Changelog Extensions
 .. _jwerner-chromium: https://github.com/jwerner-chromium
 .. _kostapr: https://github.com/kostapr
 .. _lachitp: https://github.com/lachitp
+.. _ldts: https://github.com/ldts
 .. _marex: https://github.com/marex
 .. _masahir0y: https://github.com/masahir0y
 .. _michalsimek: https://github.com/michalsimek

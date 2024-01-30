@@ -69,7 +69,7 @@ BL31_SOURCES	+=	drivers/arm/gic/v3/gic600_multichip.c
 BL31_CFLAGS		+=	-DPLAT_XLAT_TABLES_DYNAMIC
 endif
 
-ifeq (${ENABLE_FEAT_RAS}-${HANDLE_EA_EL3_FIRST_NS},1-1)
+ifeq (${RAS_FFH_SUPPORT},1)
 BL31_SOURCES		+=	${RDN2_BASE}/rdn2_ras.c			\
 				${CSS_ENT_BASE}/ras/sgi_ras_common.c	\
 				${CSS_ENT_BASE}/ras/sgi_ras_sram.c	\
@@ -93,37 +93,5 @@ NT_FW_CONFIG		:=	${BUILD_PLAT}/fdts/${PLAT}_nt_fw_config.dtb
 # Add the NT_FW_CONFIG to FIP and specify the same to certtool
 $(eval $(call TOOL_ADD_PAYLOAD,${NT_FW_CONFIG},--nt-fw-config))
 
-STMM_CONFIG_DTS		:=	${RDN2_BASE}/fdts/${PLAT}_stmm_sel0_manifest.dts
-FDT_SOURCES		+=	${STMM_CONFIG_DTS}
-TOS_FW_CONFIG		:=	${BUILD_PLAT}/fdts/$(notdir $(basename ${STMM_CONFIG_DTS})).dtb
-
-# Add the TOS_FW_CONFIG to FIP and specify the same to certtool
-$(eval $(call TOOL_ADD_PAYLOAD,${TOS_FW_CONFIG},--tos-fw-config,${TOS_FW_CONFIG}))
-
 override CTX_INCLUDE_AARCH32_REGS	:= 0
 override ENABLE_FEAT_AMU		:= 1
-
-# Enable the flag since RD-N2 has a system level cache
-NEOVERSE_Nx_EXTERNAL_LLC		:=	1
-
-# Enable N2 CPU errata workarounds
-ERRATA_N2_2002655	:=	1
-ERRATA_N2_2009478	:=	1
-ERRATA_N2_2067956	:=	1
-ERRATA_N2_2025414	:=	1
-ERRATA_N2_2189731	:=	1
-ERRATA_N2_2138956	:=	1
-ERRATA_N2_2138953	:=	1
-ERRATA_N2_2242415	:=	1
-ERRATA_N2_2138958	:=	1
-ERRATA_N2_2242400	:=	1
-ERRATA_N2_2280757	:=	1
-ERRATA_N2_2326639	:=	1
-ERRATA_N2_2340933	:=	1
-ERRATA_N2_2346952	:=	1
-ERRATA_N2_2376738	:=	1
-ERRATA_N2_2388450	:=	1
-ERRATA_N2_2743014	:=	1
-ERRATA_N2_2743089	:=	1
-ERRATA_N2_2728475	:=	1
-ERRATA_N2_2779511	:=	1

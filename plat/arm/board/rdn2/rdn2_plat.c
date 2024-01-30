@@ -137,7 +137,7 @@ void bl31_platform_setup(void)
 
 	sgi_bl31_common_platform_setup();
 
-#if ENABLE_FEAT_RAS && FFH_SUPPORT
+#if RAS_FFH_SUPPORT
 	sgi_ras_platform_setup(&ras_config);
 #endif
 }

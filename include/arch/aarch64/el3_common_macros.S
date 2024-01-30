@@ -208,10 +208,6 @@
 		 */
 		mov_imm	x0, (SCTLR_RESET_VAL & ~(SCTLR_EE_BIT | SCTLR_WXN_BIT \
 				| SCTLR_SA_BIT | SCTLR_A_BIT | SCTLR_DSSBS_BIT))
-#if ENABLE_FEAT_RAS
-		/* If FEAT_RAS is present assume FEAT_IESB is also present */
-		orr	x0, x0, #SCTLR_IESB_BIT
-#endif
 		msr	sctlr_el3, x0
 		isb
 	.endif /* _init_sctlr */
@@ -443,22 +439,6 @@
 	isb
 	msr	tcr_el1, x29
 #endif
-	.endm
-
-/* -----------------------------------------------------------------
- * The below macro reads SCR_EL3 from the context structure to
- * determine the security state of the context upon ERET.
- * ------------------------------------------------------------------
- */
-	.macro get_security_state _ret:req, _scr_reg:req
-		ubfx 	\_ret, \_scr_reg, #SCR_NSE_SHIFT, #1
-		cmp 	\_ret, #1
-		beq 	realm_state
-		bfi	\_ret, \_scr_reg, #0, #1
-		b 	end
-	realm_state:
-		mov 	\_ret, #2
-	end:
 	.endm
 
 #endif /* EL3_COMMON_MACROS_S */

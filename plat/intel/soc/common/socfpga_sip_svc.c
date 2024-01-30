@@ -229,10 +229,6 @@ static int intel_fpga_config_start(uint32_t flag)
 		request_type = BITSTREAM_AUTH;
 	}
 
-#if PLATFORM_MODEL == PLAT_SOCFPGA_AGILEX5
-	intel_smmu_hps_remapper_init(0U);
-#endif
-
 	mailbox_clear_response();
 
 	mailbox_send_cmd(MBOX_JOB_ID, MBOX_CMD_CANCEL, NULL, 0U,
@@ -284,9 +280,6 @@ static bool is_fpga_config_buffer_full(void)
 
 bool is_address_in_ddr_range(uint64_t addr, uint64_t size)
 {
-	uint128_t dram_max_sz = (uint128_t)DRAM_BASE + (uint128_t)DRAM_SIZE;
-	uint128_t dram_region_end = (uint128_t)addr + (uint128_t)size;
-
 	if (!addr && !size) {
 		return true;
 	}
@@ -296,7 +289,7 @@ bool is_address_in_ddr_range(uint64_t addr, uint64_t size)
 	if (addr < BL31_LIMIT) {
 		return false;
 	}
-	if (dram_region_end > dram_max_sz) {
+	if (addr + size > DRAM_BASE + DRAM_SIZE) {
 		return false;
 	}
 
@@ -313,10 +306,6 @@ static uint32_t intel_fpga_config_write(uint64_t mem, uint64_t size)
 		is_fpga_config_buffer_full()) {
 		return INTEL_SIP_SMC_STATUS_REJECTED;
 	}
-
-#if PLATFORM_MODEL == PLAT_SOCFPGA_AGILEX5
-	intel_smmu_hps_remapper_init(&mem);
-#endif
 
 	for (i = 0; i < FPGA_CONFIG_BUFFER_SIZE; i++) {
 		int j = (i + current_buffer) % FPGA_CONFIG_BUFFER_SIZE;
@@ -431,19 +420,8 @@ static int is_out_of_sec_range(uint64_t reg_addr)
 	case(SOCFPGA_SYSMGR(BOOT_SCRATCH_COLD_1)):	/* BOOT_SCRATCH_COLD1 */
 	case(SOCFPGA_SYSMGR(BOOT_SCRATCH_COLD_8)):	/* BOOT_SCRATCH_COLD8 */
 	case(SOCFPGA_SYSMGR(BOOT_SCRATCH_COLD_9)):	/* BOOT_SCRATCH_COLD9 */
-#endif
-	case(SOCFPGA_ECC_QSPI(CTRL)):			/* ECC_QSPI_CTRL */
-	case(SOCFPGA_ECC_QSPI(ERRINTEN)):		/* ECC_QSPI_ERRINTEN */
-	case(SOCFPGA_ECC_QSPI(ERRINTENS)):		/* ECC_QSPI_ERRINTENS */
-	case(SOCFPGA_ECC_QSPI(ERRINTENR)):		/* ECC_QSPI_ERRINTENR */
-	case(SOCFPGA_ECC_QSPI(INTMODE)):		/* ECC_QSPI_INTMODE */
-	case(SOCFPGA_ECC_QSPI(ECC_ACCCTRL)):	/* ECC_QSPI_ECC_ACCCTRL */
-	case(SOCFPGA_ECC_QSPI(ECC_STARTACC)):	/* ECC_QSPI_ECC_STARTACC */
-	case(SOCFPGA_ECC_QSPI(ECC_WDCTRL)):		/* ECC_QSPI_ECC_WDCTRL */
-	case(SOCFPGA_ECC_QSPI(INTSTAT)):		/* ECC_QSPI_INTSTAT */
-	case(SOCFPGA_ECC_QSPI(INTTEST)):		/* ECC_QSPI_INTMODE */
 		return 0;
-
+#endif
 	default:
 		break;
 	}
@@ -470,15 +448,7 @@ uint32_t intel_secure_reg_write(uint64_t reg_addr, uint32_t val,
 		return INTEL_SIP_SMC_STATUS_ERROR;
 	}
 
-	switch (reg_addr) {
-	case(SOCFPGA_ECC_QSPI(INTSTAT)):		/* ECC_QSPI_INTSTAT */
-	case(SOCFPGA_ECC_QSPI(INTTEST)):		/* ECC_QSPI_INTMODE */
-		mmio_write_16(reg_addr, val);
-		break;
-	default:
-		mmio_write_32(reg_addr, val);
-		break;
-	}
+	mmio_write_32(reg_addr, val);
 
 	return intel_secure_reg_read(reg_addr, retval);
 }
@@ -719,42 +689,14 @@ uint32_t intel_hps_set_bridges(uint64_t enable, uint64_t mask)
 }
 
 /* SDM SEU Error services */
-static uint32_t intel_sdm_seu_err_read(uint32_t *respbuf, unsigned int respbuf_sz)
+static uint32_t intel_sdm_seu_err_read(uint64_t *respbuf, unsigned int respbuf_sz)
 {
-	if (mailbox_seu_err_status(respbuf, respbuf_sz) < 0) {
+	if (mailbox_seu_err_status((uint32_t *)respbuf, respbuf_sz) < 0) {
 		return INTEL_SIP_SMC_SEU_ERR_READ_ERROR;
 	}
 
 	return INTEL_SIP_SMC_STATUS_OK;
 }
-
-/* SDM SAFE SEU Error inject services */
-static uint32_t intel_sdm_safe_inject_seu_err(uint32_t *command, uint32_t len)
-{
-	if (mailbox_safe_inject_seu_err(command, len) < 0) {
-		return INTEL_SIP_SMC_SEU_ERR_READ_ERROR;
-	}
-
-	return INTEL_SIP_SMC_STATUS_OK;
-}
-
-#if PLATFORM_MODEL == PLAT_SOCFPGA_AGILEX5
-/* SMMU HPS Remapper */
-void intel_smmu_hps_remapper_init(uint64_t *mem)
-{
-	/* Read out Bit 1 value */
-	uint32_t remap = (mmio_read_32(SOCFPGA_SYSMGR(BOOT_SCRATCH_POR_1)) & 0x02);
-
-	if (remap == 0x00) {
-		/* Update DRAM Base address for SDM SMMU */
-		mmio_write_32(SOCFPGA_SYSMGR(SDM_BE_ARADDR_REMAP), DRAM_BASE);
-		mmio_write_32(SOCFPGA_SYSMGR(SDM_BE_AWADDR_REMAP), DRAM_BASE);
-		*mem = *mem - DRAM_BASE;
-	} else {
-		*mem = *mem - DRAM_BASE;
-	}
-}
-#endif
 
 /*
  * This function is responsible for handling all SiP calls from the NS world
@@ -772,8 +714,7 @@ uintptr_t sip_smc_handler_v1(uint32_t smc_fid,
 	uint32_t retval = 0, completed_addr[3];
 	uint32_t retval2 = 0;
 	uint32_t mbox_error = 0;
-	uint64_t retval64, rsu_respbuf[9];
-	uint32_t seu_respbuf[3];
+	uint64_t retval64, rsu_respbuf[9], seu_respbuf[3];
 	int status = INTEL_SIP_SMC_STATUS_OK;
 	int mbox_status;
 	unsigned int len_in_resp;
@@ -1287,10 +1228,6 @@ uintptr_t sip_smc_handler_v1(uint32_t smc_fid,
 		} else {
 			SMC_RET3(handle, seu_respbuf[0], seu_respbuf[1], seu_respbuf[2]);
 		}
-
-	case INTEL_SIP_SMC_SAFE_INJECT_SEU_ERR:
-		status = intel_sdm_safe_inject_seu_err((uint32_t *)&x1, (uint32_t)x2);
-		SMC_RET1(handle, status);
 
 	default:
 		return socfpga_sip_handler(smc_fid, x1, x2, x3, x4,
