@@ -6,6 +6,9 @@
 
 / {
 	soc {
+		#address-cells = <1>;
+		#size-cells = <1>;
+
 		qspi: spi@1100A000 {
 			compatible = "mediatek,ipm-spi";
 			#address-cells = <1>;

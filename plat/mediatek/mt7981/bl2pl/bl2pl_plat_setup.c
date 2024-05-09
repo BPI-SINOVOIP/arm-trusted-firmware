@@ -6,10 +6,10 @@
  * Author: Weijie Gao <weijie.gao@mediatek.com>
  */
 #include <pll.h>
-#include "timer.h"
+#include <timer.h>
 
 void bl2pl_platform_setup(void)
 {
-	mtk_bl2pl_timer_init();
+	mtk_timer_init();
 	mtk_pll_init(0);
 }

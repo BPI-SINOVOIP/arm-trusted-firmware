@@ -151,8 +151,4 @@ void mtk_pll_init(int skip_dcm_setting)
 	mmio_write_32(0x10001050, 0x1 << 21);
 	/* Enable infra cfg to conctrol msdc cg */
 	mmio_clrbits_32(INFRACFG_HANG_FREE_DEBUG, (0xf << 4));
-
-#ifndef IMAGE_BL2PL
-	NOTICE("CPU: MT%x (%dMHz)\n", SOC_CHIP_ID, mt_get_ckgen_ck_freq(0) * 2);
-#endif
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2016-2023, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -11,11 +11,13 @@
 #include <platform_def.h>
 
 #include <arch.h>
+#include <arch_features.h>
 #include <arch_helpers.h>
 #include <common/bl_common.h>
 #include <context.h>
 #include <lib/el3_runtime/context_mgmt.h>
 #include <lib/extensions/amu.h>
+#include <lib/extensions/pmuv3.h>
 #include <lib/extensions/sys_reg_trace.h>
 #include <lib/extensions/trf.h>
 #include <lib/utils.h>
@@ -135,18 +137,26 @@ void cm_setup_context(cpu_context_t *ctx, const entry_point_info_t *ep)
 static void enable_extensions_nonsecure(bool el2_unused)
 {
 #if IMAGE_BL32
-#if ENABLE_AMU
-	amu_enable(el2_unused);
-#endif
+	if (is_feat_amu_supported()) {
+		amu_enable(el2_unused);
+	}
 
-#if ENABLE_SYS_REG_TRACE_FOR_NS
-	sys_reg_trace_enable();
-#endif /* ENABLE_SYS_REG_TRACE_FOR_NS */
+	if (is_feat_sys_reg_trace_supported()) {
+		sys_reg_trace_init_el3();
+	}
 
-#if ENABLE_TRF_FOR_NS
-	trf_enable();
-#endif /* ENABLE_TRF_FOR_NS */
+	if (is_feat_trf_supported()) {
+		trf_init_el3();
+	}
+
+#if SOC_CHIP_ID != U(0x7629)
+	/*
+	 * Also applies to PMU < v3. The PMU is only disabled for EL3 and Secure
+	 * state execution. This does not affect lower NS ELs.
+	 */
+	pmuv3_init_el3();
 #endif
+#endif /*  IMAGE_BL32 */
 }
 
 /*******************************************************************************

@@ -12,6 +12,10 @@
 #define PWRAP_SOFT_RST		BIT(7)
 #define PWRAP_SPI_MASTER_EN	BIT(27)
 
+#include <stdint.h>
+
+#include "platform_def.h"
+
 /* external API */
 int32_t pwrap_read(uint32_t adr, uint32_t *rdata);
 int32_t pwrap_write(uint32_t adr, uint32_t wdata);

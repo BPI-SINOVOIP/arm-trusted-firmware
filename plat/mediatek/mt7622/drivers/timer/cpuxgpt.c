@@ -20,8 +20,6 @@
 
 #define ARCH_TIMER_FREQ_DIV		2
 
-#define ARCH_TIMER_HZ			1000000
-
 static void write_cpuxgpt(uint32_t reg_index, uint32_t value)
 {
 	mmio_write_32((uintptr_t)&mt7622_mcucfg->xgpt_idx, reg_index);
@@ -62,47 +60,4 @@ void plat_mt_cpuxgpt_init(void)
 		xtal_clk = 25000000;
 
 	write_cntfrq_el0(xtal_clk / ARCH_TIMER_FREQ_DIV);
-}
-
-uint64_t tick_to_time(uint64_t ticks)
-{
-	uint32_t freq = read_cntfrq_el0();
-	uint64_t n;
-
-	if ((ULLONG_MAX - freq + 1) / ARCH_TIMER_HZ <= ticks)
-		n = ULLONG_MAX - freq + 1;
-	else
-		n = ticks * ARCH_TIMER_HZ;
-
-	return div_round_up(n, freq);
-}
-
-uint64_t time_to_tick(uint64_t usec)
-{
-	uint32_t freq = read_cntfrq_el0();
-	uint64_t n;
-
-	if ((ULLONG_MAX - ARCH_TIMER_HZ + 1) / freq <= usec)
-		n = ULLONG_MAX - ARCH_TIMER_HZ + 1;
-	else
-		n = usec * freq;
-
-	return div_round_up(n, ARCH_TIMER_HZ);
-}
-
-uint64_t get_ticks(void)
-{
-	return read_cntpct_el0();
-}
-
-uint64_t get_timer(uint64_t base)
-{
-	uint64_t tmc;
-
-	tmc = tick_to_time(read_cntpct_el0());
-
-	if (tmc >= base)
-		return tmc - base;
-
-	return ~(base - tmc);
 }

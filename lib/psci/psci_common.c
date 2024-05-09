@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2022, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2013-2023, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -55,7 +55,7 @@ unsigned int psci_plat_core_count;
  ******************************************************************************/
 non_cpu_pd_node_t psci_non_cpu_pd_nodes[PSCI_NUM_NON_CPU_PWR_DOMAINS]
 #if USE_COHERENT_MEM
-__section("tzfw_coherent_mem")
+__section(".tzfw_coherent_mem")
 #endif
 ;
 
@@ -75,6 +75,14 @@ const plat_psci_ops_t *psci_plat_pm_ops;
 CASSERT((PLAT_MAX_PWR_LVL <= PSCI_MAX_PWR_LVL) &&
 	(PLAT_MAX_PWR_LVL >= PSCI_CPU_PWR_LVL),
 	assert_platform_max_pwrlvl_check);
+
+#if PSCI_OS_INIT_MODE
+/*******************************************************************************
+ * The power state coordination mode used in CPU_SUSPEND.
+ * Defaults to platform-coordinated mode.
+ ******************************************************************************/
+suspend_mode_t psci_suspend_mode = PLAT_COORD;
+#endif
 
 /*
  * The plat_local_state used by the platform is one of these types: RUN,
@@ -153,28 +161,89 @@ void psci_query_sys_suspend_pwrstate(psci_power_state_t *state_info)
 	psci_plat_pm_ops->get_sys_suspend_power_state(state_info);
 }
 
+#if PSCI_OS_INIT_MODE
 /*******************************************************************************
- * This function verifies that the all the other cores in the system have been
- * turned OFF and the current CPU is the last running CPU in the system.
+ * This function verifies that all the other cores at the 'end_pwrlvl' have been
+ * idled and the current CPU is the last running CPU at the 'end_pwrlvl'.
  * Returns 1 (true) if the current CPU is the last ON CPU or 0 (false)
  * otherwise.
  ******************************************************************************/
-unsigned int psci_is_last_on_cpu(void)
+static bool psci_is_last_cpu_to_idle_at_pwrlvl(unsigned int end_pwrlvl)
+{
+	unsigned int my_idx, lvl, parent_idx;
+	unsigned int cpu_start_idx, ncpus, cpu_idx;
+	plat_local_state_t local_state;
+
+	if (end_pwrlvl == PSCI_CPU_PWR_LVL) {
+		return true;
+	}
+
+	my_idx = plat_my_core_pos();
+
+	for (lvl = PSCI_CPU_PWR_LVL; lvl <= end_pwrlvl; lvl++) {
+		parent_idx = psci_cpu_pd_nodes[my_idx].parent_node;
+	}
+
+	cpu_start_idx = psci_non_cpu_pd_nodes[parent_idx].cpu_start_idx;
+	ncpus = psci_non_cpu_pd_nodes[parent_idx].ncpus;
+
+	for (cpu_idx = cpu_start_idx; cpu_idx < cpu_start_idx + ncpus;
+			cpu_idx++) {
+		local_state = psci_get_cpu_local_state_by_idx(cpu_idx);
+		if (cpu_idx == my_idx) {
+			assert(is_local_state_run(local_state) != 0);
+			continue;
+		}
+
+		if (is_local_state_run(local_state) != 0) {
+			return false;
+		}
+	}
+
+	return true;
+}
+#endif
+
+/*******************************************************************************
+ * This function verifies that all the other cores in the system have been
+ * turned OFF and the current CPU is the last running CPU in the system.
+ * Returns true, if the current CPU is the last ON CPU or false otherwise.
+ ******************************************************************************/
+bool psci_is_last_on_cpu(void)
 {
 	unsigned int cpu_idx, my_idx = plat_my_core_pos();
 
-	for (cpu_idx = 0; cpu_idx < psci_plat_core_count;
-			cpu_idx++) {
+	for (cpu_idx = 0; cpu_idx < psci_plat_core_count; cpu_idx++) {
 		if (cpu_idx == my_idx) {
 			assert(psci_get_aff_info_state() == AFF_STATE_ON);
 			continue;
 		}
 
-		if (psci_get_aff_info_state_by_idx(cpu_idx) != AFF_STATE_OFF)
-			return 0;
+		if (psci_get_aff_info_state_by_idx(cpu_idx) != AFF_STATE_OFF) {
+			VERBOSE("core=%u other than current core=%u %s\n",
+				cpu_idx, my_idx, "running in the system");
+			return false;
+		}
 	}
 
-	return 1;
+	return true;
+}
+
+/*******************************************************************************
+ * This function verifies that all cores in the system have been turned ON.
+ * Returns true, if all CPUs are ON or false otherwise.
+ ******************************************************************************/
+static bool psci_are_all_cpus_on(void)
+{
+	unsigned int cpu_idx;
+
+	for (cpu_idx = 0; cpu_idx < psci_plat_core_count; cpu_idx++) {
+		if (psci_get_aff_info_state_by_idx(cpu_idx) == AFF_STATE_OFF) {
+			return false;
+		}
+	}
+
+	return true;
 }
 
 /*******************************************************************************
@@ -252,6 +321,60 @@ static plat_local_state_t *psci_get_req_local_pwr_states(unsigned int pwrlvl,
 		return NULL;
 }
 
+#if PSCI_OS_INIT_MODE
+/******************************************************************************
+ * Helper function to save a copy of the psci_req_local_pwr_states (prev) for a
+ * CPU (cpu_idx), and update psci_req_local_pwr_states with the new requested
+ * local power states (state_info).
+ *****************************************************************************/
+void psci_update_req_local_pwr_states(unsigned int end_pwrlvl,
+				      unsigned int cpu_idx,
+				      psci_power_state_t *state_info,
+				      plat_local_state_t *prev)
+{
+	unsigned int lvl;
+#ifdef PLAT_MAX_CPU_SUSPEND_PWR_LVL
+	unsigned int max_pwrlvl = PLAT_MAX_CPU_SUSPEND_PWR_LVL;
+#else
+	unsigned int max_pwrlvl = PLAT_MAX_PWR_LVL;
+#endif
+	plat_local_state_t req_state;
+
+	for (lvl = PSCI_CPU_PWR_LVL + 1U; lvl <= max_pwrlvl; lvl++) {
+		/* Save the previous requested local power state */
+		prev[lvl - 1U] = *psci_get_req_local_pwr_states(lvl, cpu_idx);
+
+		/* Update the new requested local power state */
+		if (lvl <= end_pwrlvl) {
+			req_state = state_info->pwr_domain_state[lvl];
+		} else {
+			req_state = state_info->pwr_domain_state[end_pwrlvl];
+		}
+		psci_set_req_local_pwr_state(lvl, cpu_idx, req_state);
+	}
+}
+
+/******************************************************************************
+ * Helper function to restore the previously saved requested local power states
+ * (prev) for a CPU (cpu_idx) to psci_req_local_pwr_states.
+ *****************************************************************************/
+void psci_restore_req_local_pwr_states(unsigned int cpu_idx,
+				       plat_local_state_t *prev)
+{
+	unsigned int lvl;
+#ifdef PLAT_MAX_CPU_SUSPEND_PWR_LVL
+	unsigned int max_pwrlvl = PLAT_MAX_CPU_SUSPEND_PWR_LVL;
+#else
+	unsigned int max_pwrlvl = PLAT_MAX_PWR_LVL;
+#endif
+
+	for (lvl = PSCI_CPU_PWR_LVL + 1U; lvl <= max_pwrlvl; lvl++) {
+		/* Restore the previous requested local power state */
+		psci_set_req_local_pwr_state(lvl, cpu_idx, prev[lvl - 1U]);
+	}
+}
+#endif
+
 /*
  * psci_non_cpu_pd_nodes can be placed either in normal memory or coherent
  * memory.
@@ -328,8 +451,8 @@ void psci_get_target_local_pwr_states(unsigned int end_pwrlvl,
  * enter. This function will be called after coordination of requested power
  * states has been done for each power level.
  *****************************************************************************/
-static void psci_set_target_local_pwr_states(unsigned int end_pwrlvl,
-					const psci_power_state_t *target_state)
+void psci_set_target_local_pwr_states(unsigned int end_pwrlvl,
+				      const psci_power_state_t *target_state)
 {
 	unsigned int parent_idx, lvl;
 	const plat_local_state_t *pd_state = target_state->pwr_domain_state;
@@ -350,7 +473,6 @@ static void psci_set_target_local_pwr_states(unsigned int end_pwrlvl,
 		parent_idx = psci_non_cpu_pd_nodes[parent_idx].parent_node;
 	}
 }
-
 
 /*******************************************************************************
  * PSCI helper function to get the parent nodes corresponding to a cpu_index.
@@ -398,6 +520,8 @@ void psci_set_pwr_domains_to_run(unsigned int end_pwrlvl)
 }
 
 /******************************************************************************
+ * This function is used in platform-coordinated mode.
+ *
  * This function is passed the local power states requested for each power
  * domain (state_info) between the current CPU domain and its ancestors until
  * the target power level (end_pwrlvl). It updates the array of requested power
@@ -470,10 +594,95 @@ void psci_do_state_coordination(unsigned int end_pwrlvl,
 		state_info->pwr_domain_state[lvl] = PSCI_LOCAL_STATE_RUN;
 
 	}
-
-	/* Update the target state in the power domain nodes */
-	psci_set_target_local_pwr_states(end_pwrlvl, state_info);
 }
+
+#if PSCI_OS_INIT_MODE
+/******************************************************************************
+ * This function is used in OS-initiated mode.
+ *
+ * This function is passed the local power states requested for each power
+ * domain (state_info) between the current CPU domain and its ancestors until
+ * the target power level (end_pwrlvl), and ensures the requested power states
+ * are valid. It updates the array of requested power states with this
+ * information.
+ *
+ * Then, for each level (apart from the CPU level) until the 'end_pwrlvl', it
+ * retrieves the states requested by all the cpus of which the power domain at
+ * that level is an ancestor. It passes this information to the platform to
+ * coordinate and return the target power state. If the requested state does
+ * not match the target state, the request is denied.
+ *
+ * The 'state_info' is not modified.
+ *
+ * This function will only be invoked with data cache enabled and while
+ * powering down a core.
+ *****************************************************************************/
+int psci_validate_state_coordination(unsigned int end_pwrlvl,
+				     psci_power_state_t *state_info)
+{
+	int rc = PSCI_E_SUCCESS;
+	unsigned int lvl, parent_idx, cpu_idx = plat_my_core_pos();
+	unsigned int start_idx;
+	unsigned int ncpus;
+	plat_local_state_t target_state, *req_states;
+	plat_local_state_t prev[PLAT_MAX_PWR_LVL];
+
+	assert(end_pwrlvl <= PLAT_MAX_PWR_LVL);
+	parent_idx = psci_cpu_pd_nodes[cpu_idx].parent_node;
+
+	/*
+	 * Save a copy of the previous requested local power states and update
+	 * the new requested local power states.
+	 */
+	psci_update_req_local_pwr_states(end_pwrlvl, cpu_idx, state_info, prev);
+
+	for (lvl = PSCI_CPU_PWR_LVL + 1U; lvl <= end_pwrlvl; lvl++) {
+		/* Get the requested power states for this power level */
+		start_idx = psci_non_cpu_pd_nodes[parent_idx].cpu_start_idx;
+		req_states = psci_get_req_local_pwr_states(lvl, start_idx);
+
+		/*
+		 * Let the platform coordinate amongst the requested states at
+		 * this power level and return the target local power state.
+		 */
+		ncpus = psci_non_cpu_pd_nodes[parent_idx].ncpus;
+		target_state = plat_get_target_pwr_state(lvl,
+							 req_states,
+							 ncpus);
+
+		/*
+		 * Verify that the requested power state matches the target
+		 * local power state.
+		 */
+		if (state_info->pwr_domain_state[lvl] != target_state) {
+			if (target_state == PSCI_LOCAL_STATE_RUN) {
+				rc = PSCI_E_DENIED;
+			} else {
+				rc = PSCI_E_INVALID_PARAMS;
+			}
+			goto exit;
+		}
+	}
+
+	/*
+	 * Verify that the current core is the last running core at the
+	 * specified power level.
+	 */
+	lvl = state_info->last_at_pwrlvl;
+	if (!psci_is_last_cpu_to_idle_at_pwrlvl(lvl)) {
+		rc = PSCI_E_DENIED;
+	}
+
+exit:
+	if (rc != PSCI_E_SUCCESS) {
+		/* Restore the previous requested local power states. */
+		psci_restore_req_local_pwr_states(cpu_idx, prev);
+		return rc;
+	}
+
+	return rc;
+}
+#endif
 
 /******************************************************************************
  * This function validates a suspend request by making sure that if a standby
@@ -613,8 +822,11 @@ void psci_release_pwr_domain_locks(unsigned int end_pwrlvl,
  ******************************************************************************/
 int psci_validate_mpidr(u_register_t mpidr)
 {
-	if (plat_core_pos_by_mpidr(mpidr) < 0)
+	int pos = plat_core_pos_by_mpidr(mpidr);
+
+	if ((pos < 0) || ((unsigned int)pos >= PLATFORM_CORE_COUNT)) {
 		return PSCI_E_INVALID_PARAMS;
+	}
 
 	return PSCI_E_SUCCESS;
 }
@@ -773,6 +985,9 @@ void psci_warmboot_entrypoint(void)
 	unsigned int parent_nodes[PLAT_MAX_PWR_LVL] = {0};
 	psci_power_state_t state_info = { {PSCI_LOCAL_STATE_RUN} };
 
+	/* Init registers that never change for the lifetime of TF-A */
+	cm_manage_extensions_el3();
+
 	/*
 	 * Verify that we have been explicitly turned ON or resumed from
 	 * suspend.
@@ -820,6 +1035,13 @@ void psci_warmboot_entrypoint(void)
 		psci_cpu_on_finish(cpu_idx, &state_info);
 	else
 		psci_cpu_suspend_finish(cpu_idx, &state_info);
+
+	/*
+	 * Generic management: Now we just need to retrieve the
+	 * information that we had stashed away during the cpu_on
+	 * call to set this cpu on its way.
+	 */
+	cm_prepare_el3_exit_ns();
 
 	/*
 	 * Set the requested and target state of this CPU and all the higher
@@ -954,7 +1176,7 @@ int psci_secondaries_brought_up(void)
  * Initiate power down sequence, by calling power down operations registered for
  * this CPU.
  ******************************************************************************/
-void psci_do_pwrdown_sequence(unsigned int power_level)
+void psci_pwrdown_cpu(unsigned int power_level)
 {
 #if HW_ASSISTED_COHERENCY
 	/*
@@ -1009,11 +1231,11 @@ int psci_stop_other_cores(unsigned int wait_ms,
 
 	/* Need to wait for other cores to shutdown */
 	if (wait_ms != 0U) {
-		while ((wait_ms-- != 0U) && (psci_is_last_on_cpu() != 0U)) {
+		while ((wait_ms-- != 0U) && (!psci_is_last_on_cpu())) {
 			mdelay(1U);
 		}
 
-		if (psci_is_last_on_cpu() != 0U) {
+		if (!psci_is_last_on_cpu()) {
 			WARN("Failed to stop all cores!\n");
 			psci_print_power_domain_map();
 			return PSCI_E_DENIED;
@@ -1030,48 +1252,48 @@ int psci_stop_other_cores(unsigned int wait_ms,
  *
  * This API has following differences with psci_is_last_on_cpu
  *  1. PSCI states are locked
- *  2. It caters for "forest" topology instead of just "tree"
- *  TODO : Revisit both API's and unify them
  ******************************************************************************/
 bool psci_is_last_on_cpu_safe(void)
 {
 	unsigned int this_core = plat_my_core_pos();
 	unsigned int parent_nodes[PLAT_MAX_PWR_LVL] = {0};
-	unsigned int i = 0;
 
-	/*
-	 * Traverse the forest of PSCI nodes, nodes with no parents
-	 * (invalid-nodes) are the root nodes.
-	 */
-	while ((i < PSCI_NUM_NON_CPU_PWR_DOMAINS) &&
-	       (psci_non_cpu_pd_nodes[i].parent_node ==
-	       PSCI_PARENT_NODE_INVALID)) {
-		psci_get_parent_pwr_domain_nodes(
-				psci_non_cpu_pd_nodes[i].cpu_start_idx,
-				PLAT_MAX_PWR_LVL, parent_nodes);
+	psci_get_parent_pwr_domain_nodes(this_core, PLAT_MAX_PWR_LVL, parent_nodes);
 
-		psci_acquire_pwr_domain_locks(PLAT_MAX_PWR_LVL, parent_nodes);
+	psci_acquire_pwr_domain_locks(PLAT_MAX_PWR_LVL, parent_nodes);
 
-		for (unsigned int core = 0U;
-		     core < psci_non_cpu_pd_nodes[i].ncpus; core++) {
-			if (core == this_core) {
-				continue;
-			}
-
-			if (psci_get_aff_info_state_by_idx(core) !=
-			    AFF_STATE_OFF) {
-				psci_release_pwr_domain_locks(PLAT_MAX_PWR_LVL,
-							      parent_nodes);
-				VERBOSE("core=%u other than boot core=%u %s\n",
-				       core, this_core, "running in the system");
-
-				return false;
-			}
-		}
-
+	if (!psci_is_last_on_cpu()) {
 		psci_release_pwr_domain_locks(PLAT_MAX_PWR_LVL, parent_nodes);
-		i++;
+		return false;
 	}
+
+	psci_release_pwr_domain_locks(PLAT_MAX_PWR_LVL, parent_nodes);
+
+	return true;
+}
+
+/*******************************************************************************
+ * This function verifies that all cores in the system have been turned ON.
+ * Returns true, if all CPUs are ON or false otherwise.
+ *
+ * This API has following differences with psci_are_all_cpus_on
+ *  1. PSCI states are locked
+ ******************************************************************************/
+bool psci_are_all_cpus_on_safe(void)
+{
+	unsigned int this_core = plat_my_core_pos();
+	unsigned int parent_nodes[PLAT_MAX_PWR_LVL] = {0};
+
+	psci_get_parent_pwr_domain_nodes(this_core, PLAT_MAX_PWR_LVL, parent_nodes);
+
+	psci_acquire_pwr_domain_locks(PLAT_MAX_PWR_LVL, parent_nodes);
+
+	if (!psci_are_all_cpus_on()) {
+		psci_release_pwr_domain_locks(PLAT_MAX_PWR_LVL, parent_nodes);
+		return false;
+	}
+
+	psci_release_pwr_domain_locks(PLAT_MAX_PWR_LVL, parent_nodes);
 
 	return true;
 }

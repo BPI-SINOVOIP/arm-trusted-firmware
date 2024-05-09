@@ -35,7 +35,7 @@ struct el3_lp_desc {
 #define DECLARE_LOGICAL_PARTITION(_name, _init, _sp_id, _uuid, _properties, \
 				  _direct_req)				    \
 	static const struct el3_lp_desc __partition_desc_ ## _name	    \
-		__section("el3_lp_descs") __used = {			    \
+		__section(".el3_lp_descs") __used = {			    \
 			.debug_name = #_name,				    \
 			.init = (_init),				    \
 			.sp_id = (_sp_id),				    \
@@ -49,8 +49,7 @@ struct el3_lp_desc {
  * Function & variable prototypes.
  ******************************************************************************/
 int el3_sp_desc_validate(void);
-uintptr_t handle_el3_sp(uint32_t smc_fid, void *cookie, void *handle,
-						unsigned int flags);
+
 IMPORT_SYM(uintptr_t, __EL3_LP_DESCS_START__,	EL3_LP_DESCS_START);
 IMPORT_SYM(uintptr_t, __EL3_LP_DESCS_END__,	EL3_LP_DESCS_END);
 

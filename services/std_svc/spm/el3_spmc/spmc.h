@@ -9,6 +9,7 @@
 
 #include <stdint.h>
 
+#include <common/bl_common.h>
 #include <lib/psci/psci.h>
 #include <lib/spinlock.h>
 #include <services/el3_spmc_logical_sp.h>
@@ -130,6 +131,9 @@ struct sp_exec_ctx {
 
 	/* Track the current runtime model of the SP. */
 	enum sp_runtime_model rt_model;
+
+	/* Track the source partition ID to validate a direct response. */
+	uint16_t dir_req_origin_id;
 };
 
 /*
@@ -207,24 +211,6 @@ struct ns_endpoint_desc {
 	 * Supported FF-A Version
 	 */
 	uint32_t ffa_version;
-};
-
-/**
- * Holds information returned for each partition by the FFA_PARTITION_INFO_GET
- * interface.
- */
-struct ffa_partition_info_v1_0 {
-	uint16_t ep_id;
-	uint16_t execution_ctx_count;
-	uint32_t properties;
-};
-
-/* Extended structure for v1.1. */
-struct ffa_partition_info_v1_1 {
-	uint16_t ep_id;
-	uint16_t execution_ctx_count;
-	uint32_t properties;
-	uint32_t uuid[4];
 };
 
 /* Reference to power management hooks */

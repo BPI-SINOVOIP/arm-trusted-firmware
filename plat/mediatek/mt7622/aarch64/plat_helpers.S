@@ -72,7 +72,7 @@ endfunc plat_my_core_pos
 	 * ---------------------------------------------
 	 */
 func plat_crash_console_init
-	mov_imm	x0, UART0_BASE
+	mov_imm	x0, UART_BASE
 	mov_imm	x1, UART_CLOCK
 	mov_imm	x2, UART_BAUDRATE
 	mov_imm	x3, 1
@@ -87,7 +87,7 @@ endfunc plat_crash_console_init
 	 * ---------------------------------------------
 	 */
 func plat_crash_console_putc
-	mov_imm x1, UART0_BASE
+	mov_imm x1, UART_BASE
 	b	console_hsuart_core_putc
 endfunc plat_crash_console_putc
 
@@ -100,6 +100,6 @@ endfunc plat_crash_console_putc
 	 * ---------------------------------------------
 	 */
 func plat_crash_console_flush
-	mov_imm	x0, UART0_BASE
+	mov_imm	x0, UART_BASE
 	b	console_hsuart_core_flush
 endfunc plat_crash_console_flush

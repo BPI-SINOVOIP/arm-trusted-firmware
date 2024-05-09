@@ -73,7 +73,19 @@ RMM_EL3_MANIFEST_PNG			= rmm_el3_manifest_struct.png
 rmm_el3_manifest_struct_layers		= "Background"
 rmm_el3_manifest_struct_opts		=
 
-all:$(RESET_PNGS) $(INT_PNGS) $(XLAT_PNG) $(RMM_PNG) $(RMM_EL3_MANIFEST_PNG)
+PSA_FWU_DIA				= PSA-FWU.dia
+PSA_FWU_PNG				= PSA-FWU.png
+
+FWU-update_struct_layers		= "background"
+FWU-update_struct_opts			=
+
+MB_DESIGN_DIA				= measured_boot_design.dia
+MB_DESIGN_PNG				= measured_boot_design.png
+
+measured_boot_design_layers		= "background"
+measured_boot_design_opts		=
+
+all:$(RESET_PNGS) $(INT_PNGS) $(XLAT_PNG) $(RMM_PNG) $(RMM_EL3_MANIFEST_PNG) $(PSA_FWU_PNG) $(MB_DESIGN_PNG)
 
 $(RESET_PNGS):$(RESET_DIA)
 	$(call generate_image,$($(patsubst %.png,%_layers,$@)),$@,png,$($(patsubst %.png,%_opts,$@)),$<)
@@ -89,4 +101,10 @@ $(RMM_PNG):$(RMM_DIA)
 	$(call generate_image,$($(patsubst %.png,%_layers,$@)),$@,png,$($(patsubst %.png,%_opts,$@)),$<)
 
 $(RMM_EL3_MANIFEST_PNG):$(RMM_EL3_MANIFEST_DIA)
+	$(call generate_image,$($(patsubst %.png,%_layers,$@)),$@,png,$($(patsubst %.png,%_opts,$@)),$<)
+
+$(PSA_FWU_PNG):$(PSA_FWU_DIA)
+	$(call generate_image,$($(patsubst %.png,%_layers,$@)),$@,png,$($(patsubst %.png,%_opts,$@)),$<)
+
+$(MB_DESIGN_PNG):$(MB_DESIGN_DIA)
 	$(call generate_image,$($(patsubst %.png,%_layers,$@)),$@,png,$($(patsubst %.png,%_opts,$@)),$<)

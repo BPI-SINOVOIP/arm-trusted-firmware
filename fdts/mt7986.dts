@@ -6,6 +6,9 @@
 
 / {
 	soc {
+		#address-cells = <1>;
+		#size-cells = <1>;
+
 		qspi: spi@1100A000 {
 			compatible = "mediatek,ipm-spi";
 			#address-cells = <1>;
@@ -34,8 +37,6 @@
 
 		apmixedsys: apmixedsys@1001e000 {
 			compatible = "mediatek,mt7986-pll";
-			#address-cells = <1>;
-			#size-cells = <0>;
 			reg = <0x1001e000 0x1000>;
 			status = "okay";
 		};

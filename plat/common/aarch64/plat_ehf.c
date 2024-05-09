@@ -12,7 +12,7 @@
  * Enumeration of priority levels on ARM platforms.
  */
 ehf_pri_desc_t plat_exceptions[] = {
-#if RAS_EXTENSION
+#if RAS_FFH_SUPPORT
 	/* RAS Priority */
 	EHF_PRI_DESC(PLAT_PRI_BITS, PLAT_RAS_PRI),
 #endif
@@ -24,10 +24,18 @@ ehf_pri_desc_t plat_exceptions[] = {
 	/* Normal priority SDEI */
 	EHF_PRI_DESC(PLAT_PRI_BITS, PLAT_SDEI_NORMAL_PRI),
 #endif
+
 #if SPM_MM
+#if RAS_FFH_SUPPORT
+#if (PLAT_SP_PRI != PLAT_RAS_PRI)
 	EHF_PRI_DESC(PLAT_PRI_BITS, PLAT_SP_PRI),
 #endif
-	/* Plaform specific exceptions description */
+#else
+	EHF_PRI_DESC(PLAT_PRI_BITS, PLAT_SP_PRI),
+#endif
+#endif
+
+	/* Platform specific exceptions description */
 #ifdef PLAT_EHF_DESC
 	PLAT_EHF_DESC,
 #endif

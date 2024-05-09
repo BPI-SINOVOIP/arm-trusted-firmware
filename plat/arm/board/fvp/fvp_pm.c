@@ -6,6 +6,7 @@
 
 #include <assert.h>
 
+#include <arch_features.h>
 #include <arch_helpers.h>
 #include <common/debug.h>
 #include <drivers/arm/gicv3.h>
@@ -53,35 +54,16 @@ static void fvp_cluster_pwrdwn_common(void)
 {
 	uint64_t mpidr = read_mpidr_el1();
 
-#if ENABLE_SPE_FOR_LOWER_ELS
 	/*
 	 * On power down we need to disable statistical profiling extensions
 	 * before exiting coherency.
 	 */
-	spe_disable();
-#endif
+	if (is_feat_spe_supported()) {
+		spe_disable();
+	}
 
 	/* Disable coherency if this cluster is to be turned off */
 	fvp_interconnect_disable();
-
-#if HW_ASSISTED_COHERENCY
-	uint32_t reg;
-
-	/*
-	 * If we have determined this core to be the last man standing and we
-	 * intend to power down the cluster proactively, we provide a hint to
-	 * the power controller that cluster power is not required when all
-	 * cores are powered down.
-	 * Note that this is only an advisory to power controller and is supported
-	 * by SoCs with DynamIQ Shared Units only.
-	 */
-	reg = read_clusterpwrdn();
-
-	/* Clear and set bit 0 : Cluster power not required */
-	reg &= ~DSU_CLUSTER_PWR_MASK;
-	reg |= DSU_CLUSTER_PWR_OFF;
-	write_clusterpwrdn(reg);
-#endif
 
 	/* Program the power controller to turn the cluster off */
 	fvp_pwrc_write_pcoffr(mpidr);
@@ -269,6 +251,8 @@ static void fvp_pwr_domain_suspend(const psci_power_state_t *target_state)
 
 	/* Program the power controller to power off this cpu. */
 	fvp_pwrc_write_ppoffr(read_mpidr_el1());
+
+	return;
 }
 
 /*******************************************************************************
@@ -390,6 +374,10 @@ static void fvp_get_sys_suspend_power_state(psci_power_state_t *req_state)
 
 	for (i = ARM_PWR_LVL0; i <= PLAT_MAX_PWR_LVL; i++)
 		req_state->pwr_domain_state[i] = ARM_LOCAL_STATE_OFF;
+
+#if PSCI_OS_INIT_MODE
+	req_state->last_at_pwrlvl = PLAT_MAX_PWR_LVL;
+#endif
 }
 #endif
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2014-2020, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -15,7 +15,7 @@
 #define ZYNQMP_CONSOLE_ID_cadence1	2
 #define ZYNQMP_CONSOLE_ID_dcc		3
 
-#define ZYNQMP_CONSOLE_IS(con)	(ZYNQMP_CONSOLE_ID_ ## con == ZYNQMP_CONSOLE)
+#define CONSOLE_IS(con)	(ZYNQMP_CONSOLE_ID_ ## con == ZYNQMP_CONSOLE)
 
 /* Default counter frequency */
 #define ZYNQMP_DEFAULT_COUNTER_FREQ	0U
@@ -135,7 +135,8 @@
 #define ARM_IRQ_SEC_SGI_6		14
 #define ARM_IRQ_SEC_SGI_7		15
 
-#define MAX_INTR_EL3			128
+/* number of interrupt handlers. increase as required */
+#define MAX_INTR_EL3			2
 
 /*******************************************************************************
  * UART related constants
@@ -143,19 +144,16 @@
 #define ZYNQMP_UART0_BASE		U(0xFF000000)
 #define ZYNQMP_UART1_BASE		U(0xFF010000)
 
-#if ZYNQMP_CONSOLE_IS(cadence) || ZYNQMP_CONSOLE_IS(dcc)
-# define ZYNQMP_UART_BASE	ZYNQMP_UART0_BASE
-#elif ZYNQMP_CONSOLE_IS(cadence1)
-# define ZYNQMP_UART_BASE	ZYNQMP_UART1_BASE
+#if CONSOLE_IS(cadence) || CONSOLE_IS(dcc)
+# define UART_BASE	ZYNQMP_UART0_BASE
+#elif CONSOLE_IS(cadence1)
+# define UART_BASE	ZYNQMP_UART1_BASE
 #else
 # error "invalid ZYNQMP_CONSOLE"
 #endif
 
-#define ZYNQMP_CRASH_UART_BASE		ZYNQMP_UART_BASE
-/* impossible to call C routine how it is done now - hardcode any value */
-#define ZYNQMP_CRASH_UART_CLK_IN_HZ	100000000 /* FIXME */
 /* Must be non zero */
-#define ZYNQMP_UART_BAUDRATE		115200
+#define UART_BAUDRATE		115200
 
 /* Silicon version detection */
 #define ZYNQMP_SILICON_VER_MASK		0xF000
@@ -352,7 +350,7 @@
 #define RESTART_SCOPE_SHIFT			(3)
 #define RESTART_SCOPE_MASK			(0x3U << RESTART_SCOPE_SHIFT)
 
-/*AFI registers */
+/* AFI registers */
 #define  AFIFM6_WRCTRL		U(13)
 #define  FABRIC_WIDTH		U(3)
 

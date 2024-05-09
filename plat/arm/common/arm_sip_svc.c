@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2019,2021, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2016-2023, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -13,6 +13,9 @@
 #include <lib/pmf/pmf.h>
 #include <plat/arm/common/arm_sip_svc.h>
 #include <plat/arm/common/plat_arm.h>
+#if ENABLE_SPMD_LP
+#include <services/el3_spmd_logical_sp.h>
+#endif
 #include <tools_share/uuid.h>
 
 /* ARM SiP Service UUID */
@@ -33,6 +36,14 @@ static int arm_sip_setup(void)
 	}
 
 #endif /* USE_DEBUGFS */
+
+#if ETHOSN_NPU_DRIVER
+
+	if (ethosn_smc_setup() != 0) {
+		return 1;
+	}
+
+#endif /* ETHOSN_NPU_DRIVER */
 
 	return 0;
 }
@@ -73,14 +84,14 @@ static uintptr_t arm_sip_handler(unsigned int smc_fid,
 
 #endif /* USE_DEBUGFS */
 
-#if ARM_ETHOSN_NPU_DRIVER
+#if ETHOSN_NPU_DRIVER
 
 	if (is_ethosn_fid(smc_fid)) {
 		return ethosn_smc_handler(smc_fid, x1, x2, x3, x4, cookie,
 					  handle, flags);
 	}
 
-#endif /* ARM_ETHOSN_NPU_DRIVER */
+#endif /* ETHOSN_NPU_DRIVER */
 
 	switch (smc_fid) {
 	case ARM_SIP_SVC_EXE_STATE_SWITCH: {
@@ -106,10 +117,10 @@ static uintptr_t arm_sip_handler(unsigned int smc_fid,
 		/* PMF calls */
 		call_count += PMF_NUM_SMC_CALLS;
 
-#if ARM_ETHOSN_NPU_DRIVER
+#if ETHOSN_NPU_DRIVER
 		/* ETHOSN calls */
 		call_count += ETHOSN_NUM_SMC_CALLS;
-#endif /* ARM_ETHOSN_NPU_DRIVER */
+#endif          /* ETHOSN_NPU_DRIVER */
 
 		/* State switch call */
 		call_count += 1;
@@ -125,8 +136,13 @@ static uintptr_t arm_sip_handler(unsigned int smc_fid,
 		SMC_RET2(handle, ARM_SIP_SVC_VERSION_MAJOR, ARM_SIP_SVC_VERSION_MINOR);
 
 	default:
+#if ENABLE_SPMD_LP
+		return plat_spmd_logical_sp_smc_handler(smc_fid, x1, x2, x3, x4,
+				cookie, handle, flags);
+#else
 		WARN("Unimplemented ARM SiP Service Call: 0x%x \n", smc_fid);
 		SMC_RET1(handle, SMC_UNK);
+#endif
 	}
 
 }

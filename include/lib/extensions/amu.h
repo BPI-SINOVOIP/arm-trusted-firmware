@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2021, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2017-2021, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -14,10 +14,30 @@
 
 #include <platform_def.h>
 
+#if ENABLE_FEAT_AMU
 #if __aarch64__
-void amu_enable(bool el2_unused, cpu_context_t *ctx);
+void amu_enable(cpu_context_t *ctx);
+void amu_init_el3(void);
+void amu_init_el2_unused(void);
 #else
 void amu_enable(bool el2_unused);
+#endif
+#else
+#if __aarch64__
+void amu_enable(cpu_context_t *ctx)
+{
+}
+void amu_init_el3(void)
+{
+}
+void amu_init_el2_unused(void)
+{
+}
+#else
+static inline void amu_enable(bool el2_unused)
+{
+}
+#endif
 #endif
 
 #if ENABLE_AMU_AUXILIARY_COUNTERS

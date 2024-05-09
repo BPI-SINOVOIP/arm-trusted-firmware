@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2022, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015-2023, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -39,6 +39,20 @@ typedef struct arm_tzc_regions_info {
  *   - Region 1 with secure access only;
  *   - the remaining DRAM regions access from the given Non-Secure masters.
  ******************************************************************************/
+
+#if ENABLE_RME
+#define ARM_TZC_RME_REGIONS_DEF						    \
+	{ARM_AP_TZC_DRAM1_BASE, ARM_AP_TZC_DRAM1_END, TZC_REGION_S_RDWR, 0},\
+	{ARM_EL3_TZC_DRAM1_BASE, ARM_L1_GPT_END, TZC_REGION_S_RDWR, 0},	    \
+	{ARM_NS_DRAM1_BASE, ARM_NS_DRAM1_END, ARM_TZC_NS_DRAM_S_ACCESS,	    \
+		PLAT_ARM_TZC_NS_DEV_ACCESS},				    \
+	/* Realm and Shared area share the same PAS */		    \
+	{ARM_REALM_BASE, ARM_EL3_RMM_SHARED_END, ARM_TZC_NS_DRAM_S_ACCESS,  \
+		PLAT_ARM_TZC_NS_DEV_ACCESS},				    \
+	{ARM_DRAM2_BASE, ARM_DRAM2_END, ARM_TZC_NS_DRAM_S_ACCESS,	    \
+		PLAT_ARM_TZC_NS_DEV_ACCESS}
+#endif
+
 #if SPM_MM
 #define ARM_TZC_REGIONS_DEF						\
 	{ARM_AP_TZC_DRAM1_BASE, ARM_EL3_TZC_DRAM1_END + ARM_L1_GPT_SIZE,\
@@ -52,16 +66,16 @@ typedef struct arm_tzc_regions_info {
 		PLAT_ARM_TZC_NS_DEV_ACCESS}
 
 #elif ENABLE_RME
-#define ARM_TZC_REGIONS_DEF						    \
-	{ARM_AP_TZC_DRAM1_BASE, ARM_AP_TZC_DRAM1_END, TZC_REGION_S_RDWR, 0},\
-	{ARM_EL3_TZC_DRAM1_BASE, ARM_L1_GPT_END, TZC_REGION_S_RDWR, 0},	    \
-	{ARM_NS_DRAM1_BASE, ARM_NS_DRAM1_END, ARM_TZC_NS_DRAM_S_ACCESS,	    \
-		PLAT_ARM_TZC_NS_DEV_ACCESS},				    \
-	/* Realm and Shared area share the same PAS */		    \
-	{ARM_REALM_BASE, ARM_EL3_RMM_SHARED_END, ARM_TZC_NS_DRAM_S_ACCESS,  \
-		PLAT_ARM_TZC_NS_DEV_ACCESS},				    \
-	{ARM_DRAM2_BASE, ARM_DRAM2_END, ARM_TZC_NS_DRAM_S_ACCESS,	    \
-		PLAT_ARM_TZC_NS_DEV_ACCESS}
+#if (defined(SPD_tspd) || defined(SPD_opteed) || defined(SPD_spmd)) &&  \
+MEASURED_BOOT
+#define ARM_TZC_REGIONS_DEF					        \
+	ARM_TZC_RME_REGIONS_DEF,					\
+	{ARM_EVENT_LOG_DRAM1_BASE, ARM_EVENT_LOG_DRAM1_END,             \
+		TZC_REGION_S_RDWR, 0}
+#else
+#define ARM_TZC_REGIONS_DEF					        \
+	ARM_TZC_RME_REGIONS_DEF
+#endif
 
 #else
 #define ARM_TZC_REGIONS_DEF						\
@@ -125,6 +139,12 @@ void arm_setup_romlib(void);
 #define ARM_LOCAL_PSTATE_WIDTH		4
 #define ARM_LOCAL_PSTATE_MASK		((1 << ARM_LOCAL_PSTATE_WIDTH) - 1)
 
+#if PSCI_OS_INIT_MODE
+#define ARM_LAST_AT_PLVL_MASK		(ARM_LOCAL_PSTATE_MASK <<	\
+					 (ARM_LOCAL_PSTATE_WIDTH *	\
+					  (PLAT_MAX_PWR_LVL + 1)))
+#endif /* __PSCI_OS_INIT_MODE__ */
+
 /* Macros to construct the composite power state */
 
 /* Make composite power state parameter till power level 0 */
@@ -159,7 +179,7 @@ void arm_setup_romlib(void);
 #define ARM_ROTPK_REGS_ID		1
 #define ARM_ROTPK_DEVEL_RSA_ID		2
 #define ARM_ROTPK_DEVEL_ECDSA_ID	3
-
+#define ARM_ROTPK_DEVEL_FULL_DEV_RSA_KEY_ID	4
 
 /* IO storage utility functions */
 int arm_io_setup(void);
@@ -261,8 +281,10 @@ int arm_set_nt_fw_info(
 			uintptr_t log_addr,
 #endif
 			size_t log_size, uintptr_t *ns_log_addr);
-int arm_set_tb_fw_info(uintptr_t log_addr, size_t log_size);
-int arm_get_tb_fw_info(uint64_t *log_addr, size_t *log_size);
+int arm_set_tb_fw_info(uintptr_t log_addr, size_t log_size,
+		       size_t log_max_size);
+int arm_get_tb_fw_info(uint64_t *log_addr, size_t *log_size,
+		       size_t *log_max_size);
 #endif /* MEASURED_BOOT */
 
 /*
@@ -297,6 +319,7 @@ void plat_arm_interconnect_exit_coherency(void);
 void plat_arm_program_trusted_mailbox(uintptr_t address);
 bool plat_arm_bl1_fwu_needed(void);
 __dead2 void plat_arm_error_handler(int err);
+__dead2 void plat_arm_system_reset(void);
 
 /*
  * Optional functions in ARM standard platforms
@@ -355,6 +378,7 @@ extern const unsigned int arm_pm_idle_states[];
 /* secure watchdog */
 void plat_arm_secure_wdt_start(void);
 void plat_arm_secure_wdt_stop(void);
+void plat_arm_secure_wdt_refresh(void);
 
 /* Get SOC-ID of ARM platform */
 uint32_t plat_arm_get_soc_id(void);

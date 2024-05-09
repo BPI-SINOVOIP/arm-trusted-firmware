@@ -7,6 +7,6 @@
 #ifndef _MTK_TIMER_H_
 #define _MTK_TIMER_H_
 
-#include <cpuxgpt.h>
+void mtk_timer_init(void);
 
 #endif /* _MTK_TIMER_H_ */

@@ -45,20 +45,9 @@
 #define RGU_INPUT_TYPE			BIT(1)
 
 /* Watchdog */
-#define MTK_WDT_BASE			RGU_BASE
+#define WDT_BASE			RGU_BASE
 
-#define MTK_WDT_MODE			(MTK_WDT_BASE + 0x00)
-#define MTK_WDT_MODE_ENABLE		0x0001
-#define MTK_WDT_MODE_EXTEN		0x0004
-#define MTK_WDT_MODE_IRQ		0x0008
-#define MTK_WDT_MODE_DUAL_MODE		0x0040
-#define MTK_WDT_MODE_DDR_RESERVE	0x0080
-#define MTK_WDT_MODE_KEY		0x22000000
-
-#define MTK_WDT_SWRST			(MTK_WDT_BASE + 0x14)
-#define MTK_WDT_SWRST_KEY		0x1209
-
-#define MTK_WDT_DEBUG_CTL		(MTK_WDT_BASE + 0x40)
+#define MTK_WDT_DEBUG_CTL		(WDT_BASE + 0x40)
 #define MTK_RG_DRAMC_SREF		0x00100
 #define MTK_RG_DRAMC_ISO		0x00200
 #define MTK_RG_CONF_ISO			0x00400
@@ -156,6 +145,7 @@
 
 /* UART */
 #define UART0_BASE			0x11002000
+#define UART_BASE			UART0_BASE
 #define UART_BAUDRATE			115200
 #define UART_CLOCK			25000000
 
@@ -172,5 +162,8 @@
 #define MT_IRQ_SEC_SGI_5		13
 #define MT_IRQ_SEC_SGI_6		14
 #define MT_IRQ_SEC_SGI_7		15
+
+/* Define maximum page size for NAND devices */
+#define PLATFORM_MTD_MAX_PAGE_SIZE	0x1000
 
 #endif /* MT7622_DEF_H */

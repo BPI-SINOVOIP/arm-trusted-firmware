@@ -19,17 +19,13 @@
 #include <plat_private.h>
 #include <plat/common/platform.h>
 
-#include <mtk_plat_common.h>
-#include <cpuxgpt.h>
+#include <mtk_gic_v2.h>
 #include <spmc.h>
 /******************************************************************************
  * Placeholder variables for copying the arguments that have been passed to
  * BL32 from BL2.
  ******************************************************************************/
 static entry_point_info_t bl33_image_ep_info;
-
-void plat_mt_gic_driver_init(void);
-void plat_mt_gic_init(void);
 
 static void platform_setup_sram(void)
 {
@@ -64,7 +60,7 @@ void sp_min_early_platform_setup2(u_register_t arg0, u_register_t arg1,
 {
 	static console_t console;
 
-	console_hsuart_register(UART0_BASE, plat_uart_clock(), UART_BAUDRATE,
+	console_hsuart_register(UART_BASE, plat_uart_clock(), UART_BAUDRATE,
 				true, &console);
 
 	VERBOSE("sp_min_setup\n");

@@ -10,4 +10,4 @@ BL2PL_SOURCES		+=	bl2pl/bl2pl_main.c			\
 				bl2pl/${ARCH}/bl2pl_entrypoint.S	\
 				$(XZ_SOURCES)
 
-BL2PL_LINKERFILE	:=	bl2pl/bl2pl.ld.S
+BL2PL_DEFAULT_LINKER_SCRIPT_SOURCE	:=	bl2pl/bl2pl.ld.S

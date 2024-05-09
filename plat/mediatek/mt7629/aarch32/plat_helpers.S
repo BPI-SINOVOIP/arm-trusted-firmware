@@ -18,7 +18,6 @@
 	.globl	plat_crash_console_putc
 	.globl	plat_crash_console_flush
 	.globl	plat_reset_handler
-	.globl	platform_mem_init
 
 	/* -----------------------------------------------------
 	 * void plat_secondary_cold_boot_setup (void);
@@ -41,10 +40,6 @@ endfunc plat_report_exception
 func plat_reset_handler
 	bx	lr
 endfunc plat_reset_handler
-
-func platform_mem_init
-	bx	lr
-endfunc platform_mem_init
 
 func plat_is_my_cpu_primary
 	ldcopr	r0, MPIDR
@@ -94,7 +89,7 @@ func plat_crash_console_init
 	movweq	r1, #:lower16:XTAL_CLK
 	movteq	r1, #:upper16:XTAL_CLK
 
-	mov_imm	r0, UART0_BASE
+	mov_imm	r0, UART_BASE
 	mov_imm	r2, UART_BAUDRATE
 	mov_imm	r3, 1
 	b	console_hsuart_init
@@ -108,7 +103,7 @@ endfunc plat_crash_console_init
 	 * ---------------------------------------------
 	 */
 func plat_crash_console_putc
-	mov_imm r1, UART0_BASE
+	mov_imm r1, UART_BASE
 	b	console_hsuart_core_putc
 endfunc plat_crash_console_putc
 
@@ -121,6 +116,6 @@ endfunc plat_crash_console_putc
 	 * ---------------------------------------------
 	 */
 func plat_crash_console_flush
-	mov_imm	r0, UART0_BASE
+	mov_imm	r0, UART_BASE
 	b	console_hsuart_core_flush
 endfunc plat_crash_console_flush

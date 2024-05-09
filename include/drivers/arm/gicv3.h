@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2022, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015-2023, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -315,7 +315,7 @@
 #define SGIR_IRM_SHIFT			40
 #define SGIR_IRM_MASK			ULL(0x1)
 #define SGIR_AFF3_SHIFT			48
-#define SGIR_AFF_MASK			ULL(0xf)
+#define SGIR_AFF_MASK			ULL(0xff)
 
 #define SGIR_IRM_TO_AFF			U(0)
 
@@ -353,6 +353,12 @@
 #include <common/interrupt_props.h>
 #include <drivers/arm/gic_common.h>
 #include <lib/utils_def.h>
+
+typedef enum {
+	GICV3_G1S,
+	GICV3_G1NS,
+	GICV3_G0
+} gicv3_irq_group_t;
 
 static inline uintptr_t gicv3_redist_size(uint64_t typer_val)
 {
@@ -550,7 +556,7 @@ void gicv3_cpuif_enable(unsigned int proc_num);
 void gicv3_cpuif_disable(unsigned int proc_num);
 unsigned int gicv3_get_pending_interrupt_type(void);
 unsigned int gicv3_get_pending_interrupt_id(void);
-unsigned int gicv3_get_interrupt_type(unsigned int id,
+unsigned int gicv3_get_interrupt_group(unsigned int id,
 					  unsigned int proc_num);
 void gicv3_distif_init_restore(const gicv3_dist_ctx_t * const dist_ctx);
 void gicv3_distif_save(gicv3_dist_ctx_t * const dist_ctx);
@@ -573,9 +579,10 @@ void gicv3_enable_interrupt(unsigned int id, unsigned int proc_num);
 void gicv3_disable_interrupt(unsigned int id, unsigned int proc_num);
 void gicv3_set_interrupt_priority(unsigned int id, unsigned int proc_num,
 		unsigned int priority);
-void gicv3_set_interrupt_type(unsigned int id, unsigned int proc_num,
-		unsigned int type);
-void gicv3_raise_secure_g0_sgi(unsigned int sgi_num, u_register_t target);
+void gicv3_set_interrupt_group(unsigned int id, unsigned int proc_num,
+		unsigned int group);
+void gicv3_raise_sgi(unsigned int sgi_num, gicv3_irq_group_t group,
+					 u_register_t target);
 void gicv3_set_spi_routing(unsigned int id, unsigned int irm,
 		u_register_t mpidr);
 void gicv3_set_interrupt_pending(unsigned int id, unsigned int proc_num);

@@ -40,14 +40,7 @@
 #define NFIECC_BASE			0x1100e000
 
 /* Watchdog */
-#define MTK_WDT_BASE			RGU_BASE
-#define MTK_WDT_SWRST			(MTK_WDT_BASE + 0x14)
-#define MTK_WDT_MODE_EXTEN		0x0004
-#define MTK_WDT_MODE_IRQ		0x0008
-#define MTK_WDT_MODE_DUAL_MODE		0x0040
-#define MTK_WDT_SWRST_KEY		0x1209
-#define MTK_WDT_MODE_KEY		0x22000000
-#define MTK_WDT_MODE_ENABLE		0x0001
+#define WDT_BASE			RGU_BASE
 
 /* GIC-400 & Interrupt handling */
 #define BASE_GIC_BASE			0x10310000
@@ -76,6 +69,7 @@
 
 /* UART */
 #define UART0_BASE			0x11002000
+#define UART_BASE			UART0_BASE
 #define UART_BAUDRATE			115200
 
 /* System counter frequency */
@@ -91,5 +85,8 @@
 #define MT_IRQ_SEC_SGI_5		13
 #define MT_IRQ_SEC_SGI_6		14
 #define MT_IRQ_SEC_SGI_7		15
+
+/* Define maximum page size for NAND devices */
+#define PLATFORM_MTD_MAX_PAGE_SIZE	0x1000
 
 #endif /* MT7629_DEF_H */

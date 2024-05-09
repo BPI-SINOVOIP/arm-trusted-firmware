@@ -61,9 +61,9 @@
 #define IMAGE_LOAD_ADDR		(0x40000000)
 #define TZRAM_BASE		(0x43000000)
 #if DEBUG
-#define TZRAM_SIZE		(0x20000)
+#define TZRAM_SIZE		(0x30000)
 #else
-#define TZRAM_SIZE		(0x20000)
+#define TZRAM_SIZE		(0x30000)
 #endif
 
 /* Reserved: 64KB */
@@ -113,7 +113,7 @@
  ******************************************************************************/
 #define PLAT_PHY_ADDR_SPACE_SIZE	(1ULL << 32)
 #define PLAT_VIRT_ADDR_SPACE_SIZE	(1ULL << 32)
-#define MAX_XLAT_TABLES			4
+#define MAX_XLAT_TABLES			9
 #define MAX_MMAP_REGIONS		16
 
 /*******************************************************************************

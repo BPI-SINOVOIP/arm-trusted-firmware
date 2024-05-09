@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2014-2022, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -19,12 +19,10 @@ typedef enum {
 	IO_TYPE_INVALID,
 	IO_TYPE_SEMIHOSTING,
 	IO_TYPE_MEMMAP,
-	IO_TYPE_DUMMY,
 	IO_TYPE_FIRMWARE_IMAGE_PACKAGE,
 	IO_TYPE_BLOCK,
 	IO_TYPE_MTD,
 	IO_TYPE_MMC,
-	IO_TYPE_STM32IMAGE,
 	IO_TYPE_ENCRYPTED,
 	IO_TYPE_MAX
 } io_type_t;
@@ -64,6 +62,11 @@ typedef struct io_block_spec {
 	size_t length;
 } io_block_spec_t;
 
+/* UBI specification - used to refer to data of a volume on a UBI device */
+typedef struct io_ubi_spec {
+	int vol_id;
+	const char *vol_name;
+} io_ubi_spec_t;
 
 /* Access modes used when accessing data on a device */
 #define IO_MODE_INVALID (0)

@@ -7,10 +7,7 @@ Introduction
 
 This document provides a generic threat model for TF-A firmware.
 
-.. note::
-
- This threat model doesn't consider Root and Realm worlds introduced by
- :ref:`Realm Management Extension (RME)`.
+.. _Target of Evaluation:
 
 ********************
 Target of Evaluation
@@ -36,11 +33,12 @@ assumptions:
 - There is no Secure-EL2. We don't consider threats that may come with
   Secure-EL2 software.
 
-- Measured boot is disabled. We do not consider the threats nor the mitigations
-  that may come with it.
+- There are no Root and Realm worlds. These are introduced by :ref:`Realm
+  Management Extension (RME)`.
 
 - No experimental features are enabled. We do not consider threats that may come
   from them.
+
 
 Data Flow Diagram
 =================
@@ -86,6 +84,8 @@ are considered untrusted by TF-A.
   |                 |   interrupts and registers.                            |
   +-----------------+--------------------------------------------------------+
 
+
+.. _threat_analysis:
 
 ***************
 Threat Analysis
@@ -170,7 +170,7 @@ Threat Risk Ratings
 
 For each threat identified, a risk rating that ranges
 from *informational* to *critical* is given based on the likelihood of the
-threat occuring if a mitigation is not in place, and the impact of the
+threat occurring if a mitigation is not in place, and the impact of the
 threat (i.e. how severe the consequences could be). Table 4 explains each
 rating in terms of score, impact and likelihood.
 
@@ -264,201 +264,16 @@ only get mitigated if the platform code properly fulfills its responsibilities.
 Also, some mitigations require enabling specific features, which must be
 explicitly turned on via a build flag.
 
-These are highlighted in the ``Mitigations implemented?`` box.
+When such conditions must be met, these are highlighted in the ``Mitigations
+implemented?`` box.
 
-+------------------------+----------------------------------------------------+
-| ID                     | 01                                                 |
-+========================+====================================================+
-| Threat                 | | **An attacker can mangle firmware images to      |
-|                        |   execute arbitrary code**                         |
-|                        |                                                    |
-|                        | | Some TF-A images are loaded from external        |
-|                        |   storage. It is possible for an attacker to access|
-|                        |   the external flash memory and change its contents|
-|                        |   physically, through the Rich OS, or using the    |
-|                        |   updating mechanism to modify the non-volatile    |
-|                        |   images to execute arbitrary code.                |
-+------------------------+----------------------------------------------------+
-| Diagram Elements       | DF1, DF4, DF5                                      |
-+------------------------+----------------------------------------------------+
-| Affected TF-A          | BL2, BL31                                          |
-| Components             |                                                    |
-+------------------------+----------------------------------------------------+
-| Assets                 | Code Execution                                     |
-+------------------------+----------------------------------------------------+
-| Threat Agent           | PhysicalAccess, NSCode, SecCode                    |
-+------------------------+----------------------------------------------------+
-| Threat Type            | Tampering, Elevation of Privilege                  |
-+------------------------+------------------+-----------------+---------------+
-| Application            | Server           | IoT             | Mobile        |
-+------------------------+------------------+-----------------+---------------+
-| Impact                 | Critical (5)     | Critical (5)    | Critical (5)  |
-+------------------------+------------------+-----------------+---------------+
-| Likelihood             | Critical (5)     | Critical (5)    | Critical (5)  |
-+------------------------+------------------+-----------------+---------------+
-| Total Risk Rating      | Critical (25)    | Critical (25)   | Critical (25) |
-+------------------------+------------------+-----------------+---------------+
-| Mitigations            | | 1) Implement the `Trusted Board Boot (TBB)`_     |
-|                        |   feature which prevents malicious firmware from   |
-|                        |   running on the platform by authenticating all    |
-|                        |   firmware images.                                 |
-|                        |                                                    |
-|                        | | 2) Perform extra checks on unauthenticated data, |
-|                        |   such as FIP metadata, prior to use.              |
-+------------------------+----------------------------------------------------+
-| Mitigations            | | 1) Yes, provided that the ``TRUSTED_BOARD_BOOT`` |
-| implemented?           |   build option is set to 1.                        |
-|                        |                                                    |
-|                        | | 2) Yes.                                          |
-+------------------------+----------------------------------------------------+
+As our :ref:`Target of Evaluation` is made of several, distinct firmware images,
+some threats are confined in specific images, while others apply to each of
+them. To help developers implement mitigations in the right place, threats below
+are categorized based on the firmware image that should mitigate them.
 
-+------------------------+----------------------------------------------------+
-| ID                     | 02                                                 |
-+========================+====================================================+
-| Threat                 | | **An attacker may attempt to boot outdated,      |
-|                        |   potentially vulnerable firmware image**          |
-|                        |                                                    |
-|                        | | When updating firmware, an attacker may attempt  |
-|                        |   to rollback to an older version that has unfixed |
-|                        |   vulnerabilities.                                 |
-+------------------------+----------------------------------------------------+
-| Diagram Elements       | DF1, DF4, DF5                                      |
-+------------------------+----------------------------------------------------+
-| Affected TF-A          | BL2, BL31                                          |
-| Components             |                                                    |
-+------------------------+----------------------------------------------------+
-| Assets                 | Code Execution                                     |
-+------------------------+----------------------------------------------------+
-| Threat Agent           | PhysicalAccess, NSCode, SecCode                    |
-+------------------------+----------------------------------------------------+
-| Threat Type            | Tampering                                          |
-+------------------------+------------------+-----------------+---------------+
-| Application            | Server           | IoT             | Mobile        |
-+------------------------+------------------+-----------------+---------------+
-| Impact                 | Critical (5)     | Critical (5)    | Critical (5)  |
-+------------------------+------------------+-----------------+---------------+
-| Likelihood             | Critical (5)     | Critical (5)    | Critical (5)  |
-+------------------------+------------------+-----------------+---------------+
-| Total Risk Rating      | Critical (25)    | Critical (25)   | Critical (25) |
-+------------------------+------------------+-----------------+---------------+
-| Mitigations            | Implement anti-rollback protection using           |
-|                        | non-volatile counters (NV counters) as required    |
-|                        | by `TBBR-Client specification`_.                   |
-+------------------------+----------------------------------------------------+
-| Mitigations            | | Yes / Platform specific.                         |
-| implemented?           |                                                    |
-|                        | | After a firmware image is validated, the image   |
-|                        |   revision number taken from a certificate         |
-|                        |   extension field is compared with the             |
-|                        |   corresponding NV counter stored in hardware to   |
-|                        |   make sure the new counter value is larger than   |
-|                        |   the current counter value.                       |
-|                        |                                                    |
-|                        | | **Platforms must implement this protection using |
-|                        |   platform specific hardware NV counters.**        |
-+------------------------+----------------------------------------------------+
-
-+------------------------+-------------------------------------------------------+
-| ID                     | 03                                                    |
-+========================+=======================================================+
-| Threat                 | | **An attacker can use Time-of-Check-Time-of-Use     |
-|                        |   (TOCTOU) attack to bypass image authentication      |
-|                        |   during the boot process**                           |
-|                        |                                                       |
-|                        | | Time-of-Check-Time-of-Use (TOCTOU) threats occur    |
-|                        |   when the security check is produced before the time |
-|                        |   the resource is accessed. If an attacker is sitting |
-|                        |   in the middle of the off-chip images, they could    |
-|                        |   change the binary containing executable code right  |
-|                        |   after the integrity and authentication check has    |
-|                        |   been performed.                                     |
-+------------------------+-------------------------------------------------------+
-| Diagram Elements       | DF1                                                   |
-+------------------------+-------------------------------------------------------+
-| Affected TF-A          | BL1, BL2                                              |
-| Components             |                                                       |
-+------------------------+-------------------------------------------------------+
-| Assets                 | Code Execution, Sensitive Data                        |
-+------------------------+-------------------------------------------------------+
-| Threat Agent           | PhysicalAccess                                        |
-+------------------------+-------------------------------------------------------+
-| Threat Type            | Elevation of Privilege                                |
-+------------------------+---------------------+-----------------+---------------+
-| Application            | Server              | IoT             | Mobile        |
-+------------------------+---------------------+-----------------+---------------+
-| Impact                 | N/A                 | Critical (5)    | Critical (5)  |
-+------------------------+---------------------+-----------------+---------------+
-| Likelihood             | N/A                 | Medium (3)      | Medium (3)    |
-+------------------------+---------------------+-----------------+---------------+
-| Total Risk Rating      | N/A                 | High (15)       | High (15)     |
-+------------------------+---------------------+-----------------+---------------+
-| Mitigations            | Copy image to on-chip memory before authenticating    |
-|                        | it.                                                   |
-+------------------------+-------------------------------------------------------+
-| Mitigations            | | Platform specific.                                  |
-| implemented?           |                                                       |
-|                        | | The list of images to load and their location is    |
-|                        |   platform specific. Platforms are responsible for    |
-|                        |   arranging images to be loaded in on-chip memory.    |
-+------------------------+-------------------------------------------------------+
-
-+------------------------+-------------------------------------------------------+
-| ID                     | 04                                                    |
-+========================+=======================================================+
-| Threat                 | | **An attacker with physical access can execute      |
-|                        |   arbitrary image by bypassing the signature          |
-|                        |   verification stage using glitching techniques**     |
-|                        |                                                       |
-|                        | | Glitching (Fault injection) attacks attempt to put  |
-|                        |   a hardware into a undefined state by manipulating an|
-|                        |   environmental variable such as power supply.        |
-|                        |                                                       |
-|                        | | TF-A relies on a chain of trust that starts with the|
-|                        |   ROTPK, which is the key stored inside the chip and  |
-|                        |   the root of all validation processes. If an attacker|
-|                        |   can break this chain of trust, they could execute   |
-|                        |   arbitrary code on the device. This could be         |
-|                        |   achieved with physical access to the device by      |
-|                        |   attacking the normal execution flow of the          |
-|                        |   process using glitching techniques that target      |
-|                        |   points where the image is validated against the     |
-|                        |   signature.                                          |
-+------------------------+-------------------------------------------------------+
-| Diagram Elements       | DF1                                                   |
-+------------------------+-------------------------------------------------------+
-| Affected TF-A          | BL1, BL2                                              |
-| Components             |                                                       |
-+------------------------+-------------------------------------------------------+
-| Assets                 | Code Execution                                        |
-+------------------------+-------------------------------------------------------+
-| Threat Agent           | PhysicalAccess                                        |
-+------------------------+-------------------------------------------------------+
-| Threat Type            | Tampering, Elevation of Privilege                     |
-+------------------------+---------------------+-----------------+---------------+
-| Application            | Server              | IoT             | Mobile        |
-+------------------------+---------------------+-----------------+---------------+
-| Impact                 | N/A                 | Critical (5)    | Critical (5)  |
-+------------------------+---------------------+-----------------+---------------+
-| Likelihood             | N/A                 | Medium (3)      | Medium (3)    |
-+------------------------+---------------------+-----------------+---------------+
-| Total Risk Rating      | N/A                 | High (15)       | High (15)     |
-+------------------------+---------------------+-----------------+---------------+
-| Mitigations            | Mechanisms to detect clock glitch and power           |
-|                        | variations.                                           |
-+------------------------+-------------------------------------------------------+
-| Mitigations            | | No.                                                 |
-| implemented?           |                                                       |
-|                        | | The most effective mitigation is adding glitching   |
-|                        |   detection and mitigation circuit at the hardware    |
-|                        |   level.                                              |
-|                        |                                                       |
-|                        | | However, software techniques, such as adding        |
-|                        |   redundant checks when performing conditional        |
-|                        |   branches that are security sensitive, can be used   |
-|                        |   to harden TF-A against such attacks.                |
-|                        |   **At the moment TF-A doesn't implement such         |
-|                        |   mitigations.**                                      |
-+------------------------+-------------------------------------------------------+
+General Threats for All Firmware Images
+---------------------------------------
 
 +------------------------+---------------------------------------------------+
 | ID                     | 05                                                |
@@ -576,49 +391,6 @@ These are highlighted in the ``Mitigations implemented?`` box.
 +------------------------+----------------------------------------------------+
 
 +------------------------+------------------------------------------------------+
-| ID                     | 07                                                   |
-+========================+======================================================+
-| Threat                 | | **An attacker can perform a denial-of-service      |
-|                        |   attack by using a broken SMC call that causes the  |
-|                        |   system to reboot or enter into unknown state.**    |
-|                        |                                                      |
-|                        | | Secure and non-secure clients access TF-A services |
-|                        |   through SMC calls. Malicious code can attempt to   |
-|                        |   place the TF-A runtime into an inconsistent state  |
-|                        |   by calling unimplemented SMC call or by passing    |
-|                        |   invalid arguments.                                 |
-+------------------------+------------------------------------------------------+
-| Diagram Elements       | DF4, DF5                                             |
-+------------------------+------------------------------------------------------+
-| Affected TF-A          | BL31                                                 |
-| Components             |                                                      |
-+------------------------+------------------------------------------------------+
-| Assets                 | Availability                                         |
-+------------------------+------------------------------------------------------+
-| Threat Agent           | NSCode, SecCode                                      |
-+------------------------+------------------------------------------------------+
-| Threat Type            | Denial of Service                                    |
-+------------------------+-------------------+----------------+-----------------+
-| Application            | Server            | IoT            | Mobile          |
-+------------------------+-------------------+----------------+-----------------+
-| Impact                 | Medium (3)        | Medium (3)     | Medium (3)      |
-+------------------------+-------------------+----------------+-----------------+
-| Likelihood             | High (4)          | High (4)       | High (4)        |
-+------------------------+-------------------+----------------+-----------------+
-| Total Risk Rating      | High (12)         | High (12)      | High (12)       |
-+------------------------+-------------------+----------------+-----------------+
-| Mitigations            | Validate SMC function ids and arguments before using |
-|                        | them.                                                |
-+------------------------+------------------------------------------------------+
-| Mitigations            | | Yes / Platform specific.                           |
-| implemented?           |                                                      |
-|                        | | For standard services, all input is validated.     |
-|                        |                                                      |
-|                        | | Platforms that implement SiP services must also    |
-|                        |   validate SMC call arguments.                       |
-+------------------------+------------------------------------------------------+
-
-+------------------------+------------------------------------------------------+
 | ID                     | 08                                                   |
 +========================+======================================================+
 | Threat                 | | **Memory corruption due to memory overflows and    |
@@ -689,6 +461,380 @@ These are highlighted in the ``Mitigations implemented?`` box.
 |                        |   `Trusted Firmware-A Tests`_ on Juno and FVP        |
 |                        |   platforms.                                         |
 +------------------------+------------------------------------------------------+
+
+
++------------------------+----------------------------------------------------+
+| ID                     | 11                                                 |
++========================+====================================================+
+| Threat                 | | **Misconfiguration of the Memory Management Unit |
+|                        |   (MMU) may allow a normal world software to       |
+|                        |   access sensitive data, execute arbitrary         |
+|                        |   code or access otherwise restricted HW           |
+|                        |   interface**                                      |
+|                        |                                                    |
+|                        | | A misconfiguration of the MMU could              |
+|                        |   lead to an open door for software running in the |
+|                        |   normal world to access sensitive data or even    |
+|                        |   execute code if the proper security mechanisms   |
+|                        |   are not in place.                                |
++------------------------+----------------------------------------------------+
+| Diagram Elements       | DF5, DF6                                           |
++------------------------+----------------------------------------------------+
+| Affected TF-A          | BL1, BL2, BL31                                     |
+| Components             |                                                    |
++------------------------+----------------------------------------------------+
+| Assets                 | Sensitive Data, Code execution                     |
++------------------------+----------------------------------------------------+
+| Threat Agent           | NSCode                                             |
++------------------------+----------------------------------------------------+
+| Threat Type            | Information Disclosure, Elevation of Privilege     |
++------------------------+-----------------+-----------------+----------------+
+| Application            | Server          | IoT             | Mobile         |
++------------------------+-----------------+-----------------+----------------+
+| Impact                 | Critical (5)    | Critical (5)    | Critical (5)   |
++------------------------+-----------------+-----------------+----------------+
+| Likelihood             | High (4)        | High (4)        | High (4)       |
++------------------------+-----------------+-----------------+----------------+
+| Total Risk Rating      | Critical (20)   | Critical (20)   | Critical (20)  |
++------------------------+-----------------+-----------------+----------------+
+| Mitigations            | When configuring access permissions, the           |
+|                        | principle of least privilege ought to be           |
+|                        | enforced. This means we should not grant more      |
+|                        | privileges than strictly needed, e.g. code         |
+|                        | should be read-only executable, read-only data     |
+|                        | should be read-only execute-never, and so on.      |
++------------------------+----------------------------------------------------+
+| Mitigations            | | Platform specific.                               |
+| implemented?           |                                                    |
+|                        | | MMU configuration is platform specific,          |
+|                        |   therefore platforms need to make sure that the   |
+|                        |   correct attributes are assigned to memory        |
+|                        |   regions.                                         |
+|                        |                                                    |
+|                        | | TF-A provides a library which abstracts the      |
+|                        |   low-level details of MMU configuration. It       |
+|                        |   provides well-defined and tested APIs.           |
+|                        |   Platforms are encouraged to use it to limit the  |
+|                        |   risk of misconfiguration.                        |
++------------------------+----------------------------------------------------+
+
+
++------------------------+-----------------------------------------------------+
+| ID                     | 13                                                  |
++========================+=====================================================+
+| Threat                 | | **Leaving sensitive information in the memory,    |
+|                        |   can allow an attacker to retrieve them.**         |
+|                        |                                                     |
+|                        | | Accidentally leaving not-needed sensitive data in |
+|                        |   internal buffers can leak them if an attacker     |
+|                        |   gains access to memory due to a vulnerability.    |
++------------------------+-----------------------------------------------------+
+| Diagram Elements       | DF4, DF5                                            |
++------------------------+-----------------------------------------------------+
+| Affected TF-A          | BL1, BL2, BL31                                      |
+| Components             |                                                     |
++------------------------+-----------------------------------------------------+
+| Assets                 | Sensitive Data                                      |
++------------------------+-----------------------------------------------------+
+| Threat Agent           | NSCode, SecCode                                     |
++------------------------+-----------------------------------------------------+
+| Threat Type            | Information Disclosure                              |
++------------------------+-------------------+----------------+----------------+
+| Application            | Server            | IoT            | Mobile         |
++------------------------+-------------------+----------------+----------------+
+| Impact                 |  Critical (5)     | Critical (5)   | Critical (5)   |
++------------------------+-------------------+----------------+----------------+
+| Likelihood             |  Medium (3)       | Medium (3)     | Medium (3)     |
++------------------------+-------------------+----------------+----------------+
+| Total Risk Rating      |  High (15)        | High (15)      | High (15)      |
++------------------------+-------------------+----------------+----------------+
+| Mitigations            |   Clear the sensitive data from internal buffers as |
+|                        |   soon as they are not needed anymore.              |
++------------------------+-----------------------------------------------------+
+| Mitigations            | | Yes / Platform specific                           |
++------------------------+-----------------------------------------------------+
+
+
+Threats to be Mitigated by the Boot Firmware
+--------------------------------------------
+
+The boot firmware here refers to the boot ROM (BL1) and the trusted boot
+firmware (BL2). Typically it does not stay resident in memory and it is
+dismissed once execution has reached the runtime EL3 firmware (BL31). Thus, past
+that point in time, the threats below can no longer be exploited.
+
+Note, however, that this is not necessarily true on all platforms. Platform
+vendors should review these threats to make sure they cannot be exploited
+nonetheless once execution has reached the runtime EL3 firmware.
+
++------------------------+----------------------------------------------------+
+| ID                     | 01                                                 |
++========================+====================================================+
+| Threat                 | | **An attacker can mangle firmware images to      |
+|                        |   execute arbitrary code**                         |
+|                        |                                                    |
+|                        | | Some TF-A images are loaded from external        |
+|                        |   storage. It is possible for an attacker to access|
+|                        |   the external flash memory and change its contents|
+|                        |   physically, through the Rich OS, or using the    |
+|                        |   updating mechanism to modify the non-volatile    |
+|                        |   images to execute arbitrary code.                |
++------------------------+----------------------------------------------------+
+| Diagram Elements       | DF1, DF4, DF5                                      |
++------------------------+----------------------------------------------------+
+| Affected TF-A          | BL2, BL31                                          |
+| Components             |                                                    |
++------------------------+----------------------------------------------------+
+| Assets                 | Code Execution                                     |
++------------------------+----------------------------------------------------+
+| Threat Agent           | PhysicalAccess, NSCode, SecCode                    |
++------------------------+----------------------------------------------------+
+| Threat Type            | Tampering, Elevation of Privilege                  |
++------------------------+------------------+-----------------+---------------+
+| Application            | Server           | IoT             | Mobile        |
++------------------------+------------------+-----------------+---------------+
+| Impact                 | Critical (5)     | Critical (5)    | Critical (5)  |
++------------------------+------------------+-----------------+---------------+
+| Likelihood             | Critical (5)     | Critical (5)    | Critical (5)  |
++------------------------+------------------+-----------------+---------------+
+| Total Risk Rating      | Critical (25)    | Critical (25)   | Critical (25) |
++------------------------+------------------+-----------------+---------------+
+| Mitigations            | | 1) Implement the `Trusted Board Boot (TBB)`_     |
+|                        |   feature which prevents malicious firmware from   |
+|                        |   running on the platform by authenticating all    |
+|                        |   firmware images.                                 |
+|                        |                                                    |
+|                        | | 2) Perform extra checks on unauthenticated data, |
+|                        |   such as FIP metadata, prior to use.              |
++------------------------+----------------------------------------------------+
+| Mitigations            | | 1) Yes, provided that the ``TRUSTED_BOARD_BOOT`` |
+| implemented?           |   build option is set to 1.                        |
+|                        |                                                    |
+|                        | | 2) Yes.                                          |
++------------------------+----------------------------------------------------+
+
++------------------------+----------------------------------------------------+
+| ID                     | 02                                                 |
++========================+====================================================+
+| Threat                 | | **An attacker may attempt to boot outdated,      |
+|                        |   potentially vulnerable firmware image**          |
+|                        |                                                    |
+|                        | | When updating firmware, an attacker may attempt  |
+|                        |   to rollback to an older version that has unfixed |
+|                        |   vulnerabilities.                                 |
++------------------------+----------------------------------------------------+
+| Diagram Elements       | DF1, DF4, DF5                                      |
++------------------------+----------------------------------------------------+
+| Affected TF-A          | BL2, BL31                                          |
+| Components             |                                                    |
++------------------------+----------------------------------------------------+
+| Assets                 | Code Execution                                     |
++------------------------+----------------------------------------------------+
+| Threat Agent           | PhysicalAccess, NSCode, SecCode                    |
++------------------------+----------------------------------------------------+
+| Threat Type            | Tampering                                          |
++------------------------+------------------+-----------------+---------------+
+| Application            | Server           | IoT             | Mobile        |
++------------------------+------------------+-----------------+---------------+
+| Impact                 | Critical (5)     | Critical (5)    | Critical (5)  |
++------------------------+------------------+-----------------+---------------+
+| Likelihood             | Critical (5)     | Critical (5)    | Critical (5)  |
++------------------------+------------------+-----------------+---------------+
+| Total Risk Rating      | Critical (25)    | Critical (25)   | Critical (25) |
++------------------------+------------------+-----------------+---------------+
+| Mitigations            | Implement anti-rollback protection using           |
+|                        | non-volatile counters (NV counters) as required    |
+|                        | by `TBBR-Client specification`_.                   |
++------------------------+----------------------------------------------------+
+| Mitigations            | | Yes / Platform specific.                         |
+| implemented?           |                                                    |
+|                        | | After a firmware image is validated, the image   |
+|                        |   revision number taken from a certificate         |
+|                        |   extension field is compared with the             |
+|                        |   corresponding NV counter stored in hardware to   |
+|                        |   make sure the new counter value is larger than   |
+|                        |   the current counter value.                       |
+|                        |                                                    |
+|                        | | **Platforms must implement this protection using |
+|                        |   platform specific hardware NV counters.**        |
++------------------------+----------------------------------------------------+
+
+
++------------------------+-------------------------------------------------------+
+| ID                     | 03                                                    |
++========================+=======================================================+
+| Threat                 | | **An attacker can use Time-of-Check-Time-of-Use     |
+|                        |   (TOCTOU) attack to bypass image authentication      |
+|                        |   during the boot process**                           |
+|                        |                                                       |
+|                        | | Time-of-Check-Time-of-Use (TOCTOU) threats occur    |
+|                        |   when the security check is produced before the time |
+|                        |   the resource is accessed. If an attacker is sitting |
+|                        |   in the middle of the off-chip images, they could    |
+|                        |   change the binary containing executable code right  |
+|                        |   after the integrity and authentication check has    |
+|                        |   been performed.                                     |
++------------------------+-------------------------------------------------------+
+| Diagram Elements       | DF1                                                   |
++------------------------+-------------------------------------------------------+
+| Affected TF-A          | BL1, BL2                                              |
+| Components             |                                                       |
++------------------------+-------------------------------------------------------+
+| Assets                 | Code Execution, Sensitive Data                        |
++------------------------+-------------------------------------------------------+
+| Threat Agent           | PhysicalAccess                                        |
++------------------------+-------------------------------------------------------+
+| Threat Type            | Elevation of Privilege                                |
++------------------------+---------------------+-----------------+---------------+
+| Application            | Server              | IoT             | Mobile        |
++------------------------+---------------------+-----------------+---------------+
+| Impact                 | N/A                 | Critical (5)    | Critical (5)  |
++------------------------+---------------------+-----------------+---------------+
+| Likelihood             | N/A                 | Medium (3)      | Medium (3)    |
++------------------------+---------------------+-----------------+---------------+
+| Total Risk Rating      | N/A                 | High (15)       | High (15)     |
++------------------------+---------------------+-----------------+---------------+
+| Mitigations            | Copy image to on-chip memory before authenticating    |
+|                        | it.                                                   |
++------------------------+-------------------------------------------------------+
+| Mitigations            | | Platform specific.                                  |
+| implemented?           |                                                       |
+|                        | | The list of images to load and their location is    |
+|                        |   platform specific. Platforms are responsible for    |
+|                        |   arranging images to be loaded in on-chip memory.    |
++------------------------+-------------------------------------------------------+
+
+
++------------------------+-------------------------------------------------------+
+| ID                     | 04                                                    |
++========================+=======================================================+
+| Threat                 | | **An attacker with physical access can execute      |
+|                        |   arbitrary image by bypassing the signature          |
+|                        |   verification stage using glitching techniques**     |
+|                        |                                                       |
+|                        | | Glitching (Fault injection) attacks attempt to put  |
+|                        |   a hardware into a undefined state by manipulating an|
+|                        |   environmental variable such as power supply.        |
+|                        |                                                       |
+|                        | | TF-A relies on a chain of trust that starts with the|
+|                        |   ROTPK, which is the key stored inside the chip and  |
+|                        |   the root of all validation processes. If an attacker|
+|                        |   can break this chain of trust, they could execute   |
+|                        |   arbitrary code on the device. This could be         |
+|                        |   achieved with physical access to the device by      |
+|                        |   attacking the normal execution flow of the          |
+|                        |   process using glitching techniques that target      |
+|                        |   points where the image is validated against the     |
+|                        |   signature.                                          |
++------------------------+-------------------------------------------------------+
+| Diagram Elements       | DF1                                                   |
++------------------------+-------------------------------------------------------+
+| Affected TF-A          | BL1, BL2                                              |
+| Components             |                                                       |
++------------------------+-------------------------------------------------------+
+| Assets                 | Code Execution                                        |
++------------------------+-------------------------------------------------------+
+| Threat Agent           | PhysicalAccess                                        |
++------------------------+-------------------------------------------------------+
+| Threat Type            | Tampering, Elevation of Privilege                     |
++------------------------+---------------------+-----------------+---------------+
+| Application            | Server              | IoT             | Mobile        |
++------------------------+---------------------+-----------------+---------------+
+| Impact                 | N/A                 | Critical (5)    | Critical (5)  |
++------------------------+---------------------+-----------------+---------------+
+| Likelihood             | N/A                 | Medium (3)      | Medium (3)    |
++------------------------+---------------------+-----------------+---------------+
+| Total Risk Rating      | N/A                 | High (15)       | High (15)     |
++------------------------+---------------------+-----------------+---------------+
+| Mitigations            | Mechanisms to detect clock glitch and power           |
+|                        | variations.                                           |
++------------------------+-------------------------------------------------------+
+| Mitigations            | | No.                                                 |
+| implemented?           |                                                       |
+|                        | | The most effective mitigation is adding glitching   |
+|                        |   detection and mitigation circuit at the hardware    |
+|                        |   level.                                              |
+|                        |                                                       |
+|                        | | However, software techniques, such as adding        |
+|                        |   redundant checks when performing conditional        |
+|                        |   branches that are security sensitive, can be used   |
+|                        |   to harden TF-A against such attacks.                |
+|                        |   **At the moment TF-A doesn't implement such         |
+|                        |   mitigations.**                                      |
++------------------------+-------------------------------------------------------+
+
+.. topic:: Measured Boot Threats (or lack of)
+
+ In the current Measured Boot design, BL1, BL2, and BL31, as well as the
+ secure world components, form the |SRTM|. Measurement data is currently
+ considered an asset to be protected against attack, and this is achieved
+ by storing them in the Secure Memory.
+ Beyond the measurements stored inside the TCG-compliant Event Log buffer,
+ there are no other assets to protect or threats to defend against that
+ could compromise |TF-A| execution environment's security.
+
+ There are general security assets and threats associated with remote/delegated
+ attestation. However, these are outside the |TF-A| security boundary and
+ should be dealt with by the appropriate agent in the platform/system.
+ Since current Measured Boot design does not use local attestation, there would
+ be no further assets to protect(like unsealed keys).
+
+ A limitation of the current Measured Boot design is that it is dependent upon
+ Secure Boot as implementation of Measured Boot does not extend measurements
+ into a discrete |TPM|, where they would be securely stored and protected
+ against tampering. This implies that if Secure-Boot is compromised, Measured
+ Boot may also be compromised.
+
+ Platforms must carefully evaluate the security of the default implementation
+ since the |SRTM| includes all secure world components.
+
+
+Threats to be Mitigated by the Runtime EL3 Firmware
+---------------------------------------------------
+
++------------------------+------------------------------------------------------+
+| ID                     | 07                                                   |
++========================+======================================================+
+| Threat                 | | **An attacker can perform a denial-of-service      |
+|                        |   attack by using a broken SMC call that causes the  |
+|                        |   system to reboot or enter into unknown state.**    |
+|                        |                                                      |
+|                        | | Secure and non-secure clients access TF-A services |
+|                        |   through SMC calls. Malicious code can attempt to   |
+|                        |   place the TF-A runtime into an inconsistent state  |
+|                        |   by calling unimplemented SMC call or by passing    |
+|                        |   invalid arguments.                                 |
++------------------------+------------------------------------------------------+
+| Diagram Elements       | DF4, DF5                                             |
++------------------------+------------------------------------------------------+
+| Affected TF-A          | BL31                                                 |
+| Components             |                                                      |
++------------------------+------------------------------------------------------+
+| Assets                 | Availability                                         |
++------------------------+------------------------------------------------------+
+| Threat Agent           | NSCode, SecCode                                      |
++------------------------+------------------------------------------------------+
+| Threat Type            | Denial of Service                                    |
++------------------------+-------------------+----------------+-----------------+
+| Application            | Server            | IoT            | Mobile          |
++------------------------+-------------------+----------------+-----------------+
+| Impact                 | Medium (3)        | Medium (3)     | Medium (3)      |
++------------------------+-------------------+----------------+-----------------+
+| Likelihood             | High (4)          | High (4)       | High (4)        |
++------------------------+-------------------+----------------+-----------------+
+| Total Risk Rating      | High (12)         | High (12)      | High (12)       |
++------------------------+-------------------+----------------+-----------------+
+| Mitigations            | Validate SMC function ids and arguments before using |
+|                        | them.                                                |
++------------------------+------------------------------------------------------+
+| Mitigations            | | Yes / Platform specific.                           |
+| implemented?           |                                                      |
+|                        | | For standard services, all input is validated.     |
+|                        |                                                      |
+|                        | | Platforms that implement SiP services must also    |
+|                        |   validate SMC call arguments.                       |
++------------------------+------------------------------------------------------+
+
 
 +------------------------+------------------------------------------------------+
 | ID                     | 09                                                   |
@@ -773,59 +919,6 @@ These are highlighted in the ``Mitigations implemented?`` box.
 |                        |   attacks.                                          |
 +------------------------+-----------------------------------------------------+
 
-+------------------------+----------------------------------------------------+
-| ID                     | 11                                                 |
-+========================+====================================================+
-| Threat                 | | **Misconfiguration of the Memory Management Unit |
-|                        |   (MMU) may allow a normal world software to       |
-|                        |   access sensitive data or execute arbitrary       |
-|                        |   code**                                           |
-|                        |                                                    |
-|                        | | A misconfiguration of the MMU could              |
-|                        |   lead to an open door for software running in the |
-|                        |   normal world to access sensitive data or even    |
-|                        |   execute code if the proper security mechanisms   |
-|                        |   are not in place.                                |
-+------------------------+----------------------------------------------------+
-| Diagram Elements       | DF5, DF6                                           |
-+------------------------+----------------------------------------------------+
-| Affected TF-A          | BL1, BL2, BL31                                     |
-| Components             |                                                    |
-+------------------------+----------------------------------------------------+
-| Assets                 | Sensitive Data, Code execution                     |
-+------------------------+----------------------------------------------------+
-| Threat Agent           | NSCode                                             |
-+------------------------+----------------------------------------------------+
-| Threat Type            | Information Disclosure, Elevation of Privilege     |
-+------------------------+-----------------+-----------------+----------------+
-| Application            | Server          | IoT             | Mobile         |
-+------------------------+-----------------+-----------------+----------------+
-| Impact                 | Critical (5)    | Critical (5)    | Critical (5)   |
-+------------------------+-----------------+-----------------+----------------+
-| Likelihood             | High (4)        | High (4)        | High (4)       |
-+------------------------+-----------------+-----------------+----------------+
-| Total Risk Rating      | Critical (20)   | Critical (20)   | Critical (20)  |
-+------------------------+-----------------+-----------------+----------------+
-| Mitigations            | When configuring access permissions, the           |
-|                        | principle of least privilege ought to be           |
-|                        | enforced. This means we should not grant more      |
-|                        | privileges than strictly needed, e.g. code         |
-|                        | should be read-only executable, read-only data     |
-|                        | should be read-only execute-never, and so on.      |
-+------------------------+----------------------------------------------------+
-| Mitigations            | | Platform specific.                               |
-| implemented?           |                                                    |
-|                        | | MMU configuration is platform specific,          |
-|                        |   therefore platforms need to make sure that the   |
-|                        |   correct attributes are assigned to memory        |
-|                        |   regions.                                         |
-|                        |                                                    |
-|                        | | TF-A provides a library which abstracts the      |
-|                        |   low-level details of MMU configuration. It       |
-|                        |   provides well-defined and tested APIs.           |
-|                        |   Platforms are encouraged to use it to limit the  |
-|                        |   risk of misconfiguration.                        |
-+------------------------+----------------------------------------------------+
 
 +------------------------+-----------------------------------------------------+
 | ID                     | 12                                                  |
@@ -852,6 +945,8 @@ These are highlighted in the ``Mitigations implemented?`` box.
 | Threat Agent           | NSCode                                              |
 +------------------------+-----------------------------------------------------+
 | Threat Type            | Information Disclosure                              |
++------------------------+-------------------+----------------+----------------+
+| Application            | Server            | IoT            | Mobile         |
 +------------------------+-------------------+----------------+----------------+
 | Impact                 | Medium (3)        | Medium (3)     | Medium (3)     |
 +------------------------+-------------------+----------------+----------------+
@@ -880,9 +975,58 @@ These are highlighted in the ``Mitigations implemented?`` box.
 |                        |   mitigated.                                        |
 +------------------------+-----------------------------------------------------+
 
+
+Threats to be Mitigated by an External Agent Outside of TF-A
+------------------------------------------------------------
+
++------------------------+-----------------------------------------------------+
+| ID                     | 14                                                  |
++========================+=====================================================+
+| Threat                 | | **Attacker wants to execute an arbitrary or       |
+|                        |   untrusted binary as the secure OS.**              |
+|                        |                                                     |
+|                        | | When the option OPTEE_ALLOW_SMC_LOAD is enabled,  |
+|                        |   this trusts the non-secure world up until the     |
+|                        |   point it issues the SMC call to load the Secure   |
+|                        |   BL32 payload. If a compromise occurs before the   |
+|                        |   SMC call is invoked, then arbitrary code execution|
+|                        |   in S-EL1 can occur or arbitrary memory in EL3 can |
+|                        |   be overwritten.                                   |
++------------------------+-----------------------------------------------------+
+| Diagram Elements       | DF5                                                 |
++------------------------+-----------------------------------------------------+
+| Affected TF-A          | BL31, BL32                                          |
+| Components             |                                                     |
++------------------------+-----------------------------------------------------+
+| Assets                 | Code Execution, Sensitive Data                      |
++------------------------+-----------------------------------------------------+
+| Threat Agent           | NSCode                                              |
++------------------------+-----------------------------------------------------+
+| Threat Type            | Tampering, Information Disclosure,                  |
+|                        | Elevation of privilege                              |
++------------------------+-----------------+-----------------+-----------------+
+| Application            | Server          | IoT             | Mobile          |
++------------------------+-----------------+-----------------+-----------------+
+| Impact                 | Critical (5)    | Critical (5)    | Critical (5)    |
++------------------------+-----------------+-----------------+-----------------+
+| Likelihood             | High (4)        | High (4)        | High (4)        |
++------------------------+-----------------+-----------------+-----------------+
+| Total Risk Rating      | Critical (20)   | Critical (20)   | Critical (20)   |
++------------------------+-----------------+-----------------+-----------------+
+| Mitigations            | When enabling the option OPTEE_ALLOW_SMC_LOAD,      |
+|                        | the non-secure OS must be considered a closed       |
+|                        | platform up until the point the SMC can be invoked  |
+|                        | to load OP-TEE.                                     |
++------------------------+-----------------------------------------------------+
+| Mitigations            | | None in TF-A itself. This option is only used by  |
+| implemented?           |   ChromeOS currently which has other mechanisms to  |
+|                        |   to mitigate this threat which are described in    |
+|                        |   `OP-TEE Dispatcher`_.                             |
++------------------------+-----------------------------------------------------+
+
 --------------
 
-*Copyright (c) 2021-2022, Arm Limited. All rights reserved.*
+*Copyright (c) 2021-2023, Arm Limited. All rights reserved.*
 
 
 .. _STRIDE threat analysis technique: https://docs.microsoft.com/en-us/azure/security/develop/threat-modeling-tool-threats#stride-model
@@ -894,3 +1038,4 @@ These are highlighted in the ``Mitigations implemented?`` box.
 .. _TF-A error handling policy: https://trustedfirmware-a.readthedocs.io/en/latest/process/coding-guidelines.html#error-handling-and-robustness
 .. _Secure Development Guidelines: https://trustedfirmware-a.readthedocs.io/en/latest/process/security-hardening.html#secure-development-guidelines
 .. _Trusted Firmware-A Tests: https://git.trustedfirmware.org/TF-A/tf-a-tests.git/about/
+.. _OP-TEE Dispatcher: https://github.com/ARM-software/arm-trusted-firmware/blob/master/docs/components/spd/optee-dispatcher.rst

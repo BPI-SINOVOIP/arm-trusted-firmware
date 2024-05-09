@@ -1,25 +1,7 @@
 #!/bin/bash
-# Copyright (C) 2021-2022 SkyLake Huang
-#
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 2 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License along
-# with this program; if not, write to the Free Software Foundation, Inc.,
-# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-#
-# Use this script to compose single image.
-# Author: SkyLake Huang
-# Email: skylake.huang@mediatek.com
-
 #global variables:
+gpt_start_dec=0
+gpt_start_hex=0
 bl2_start_dec=0
 bl2_start_hex=0x0
 rf_start_dec=0
@@ -31,6 +13,7 @@ kernel_start_hex=0x0
 rootfs_start_dec=0
 rootfs_start_hex=0x0
 rootfs_image=""
+sdmmc_extracted_folder=""
 
 # Regular Colors
 RED='\033[0;31m'
@@ -57,7 +40,7 @@ usage() {
 '                  -b bl2-iap-snand-20220114.img \\\n'\
 '                  -f fip-snand-20220114.bin \\\n'\
 '                  -k OF_openwrt-mediatek-mt7986-mt7986a-ax6000-spim-nand-rfb-squashfs-factory.bin \\\n'
-	exit
+	exit 0
 }
 
 parse_yaml() {
@@ -82,6 +65,10 @@ load_partition() {
 	for line in `parse_yaml $partition_config`; do
 		IFS='=' read -ra arr <<< "$line"
 		case "${arr[0]}" in
+			gpt_start )
+				gpt_start_hex=${arr[1]}
+				gpt_start_dec=`printf '%d' $gpt_start_hex`
+				;;
 			bl2_start )
 				bl2_start_hex=${arr[1]}
 				bl2_start_dec=`printf '%d' $bl2_start_hex`
@@ -111,19 +98,19 @@ prepare_image() {
 	then
 		if [[ $flash_type == "emmc" ]] || [[ $flash_type == "sd" ]]
 		then
-			dd if=/dev/zero ibs=$fip_start_dec count=1 status=none \
+			dd if=/dev/zero ibs=$fip_start_dec count=1 \
 				> $single_image
 		else
-			dd if=/dev/zero ibs=$fip_start_dec count=1 status=none \
+			dd if=/dev/zero ibs=$fip_start_dec count=1 \
 				| tr "\000" "\377" > $single_image
 		fi
 	else
 		if [[ $flash_type == "emmc" ]] || [[ $flash_type == "sd" ]]
 		then
-			dd if=/dev/zero ibs=$kernel_start_dec count=1 status=none \
+			dd if=/dev/zero ibs=$kernel_start_dec count=1 \
 				> $single_image 2>&1
 		else
-			dd if=/dev/zero ibs=$kernel_start_dec count=1 status=none \
+			dd if=/dev/zero ibs=$kernel_start_dec count=1 \
 				| tr "\000" "\377" > $single_image 2>&1
 		fi
 	fi
@@ -135,6 +122,8 @@ extract_sdmmc_kernel() {
 
 	#For debugging
 	#echo "There are ${#output_arr[*]}" next lines in the output.
+
+	sdmmc_extracted_folder=${output_arr[0]}
 
 	for filename in "${output_arr[@]}";
 	do
@@ -151,29 +140,29 @@ extract_sdmmc_kernel() {
 start_wrapping() {
 	printf "[Start wrapping %s single image......]\n" $flash_type
 
+	if [[ $flash_type == "emmc" ]] || [[ $flash_type == "sd" ]]
+	then
+		printf "[wrapping GPT......]\n"
+		dd if=$gpt of=$single_image bs=512 seek=0 conv=notrunc
+	fi
+
 	if [[ $flash_type != "emmc" ]]
 	then
 		printf "[wrapping BL2 image......]\n"
 		dd if=$bl2_image of=$single_image bs=512 \
-			seek=$(( ($bl2_start_dec/512) )) conv=notrunc status=none
-	fi
-
-	if [[ $flash_type == "emmc" ]] || [[ $flash_type == "sd" ]]
-	then
-		printf "[wrapping GPT......]\n"
-		dd if=$gpt of=$single_image bs=512 seek=0 conv=notrunc status=none
+			seek=$(( ($bl2_start_dec/512) )) conv=notrunc
 	fi
 
 	if [[ -n $rf_image ]]
 	then
 		printf "[wrapping RF image......]\n"
 		dd if=$rf_image of=$single_image bs=512 \
-			seek=$(( ($rf_start_dec/512) )) conv=notrunc status=none
+			seek=$(( ($rf_start_dec/512) )) conv=notrunc
 	fi
 
 	printf "[wrapping FIP image......]\n"
 	dd if=$fip_image of=$single_image bs=512 \
-		seek=$(( ($fip_start_dec/512) )) conv=notrunc status=none
+		seek=$(( ($fip_start_dec/512) )) conv=notrunc
 
 	if [[ -n $kernel_image ]]
 	then
@@ -182,21 +171,26 @@ start_wrapping() {
 		then
 			extract_sdmmc_kernel
 			dd if=$kernel_image of=$single_image bs=512 \
-				seek=$(( ($kernel_start_dec/512) )) conv=notrunc status=none
+				seek=$(( ($kernel_start_dec/512) )) conv=notrunc
 			printf "[wrapping rootfs image......]\n"
 			dd if=$rootfs_image of=$single_image bs=512 \
-				seek=$(( ($rootfs_start_dec/512) )) conv=notrunc status=none
+				seek=$(( ($rootfs_start_dec/512) )) conv=notrunc
+			rm -r $sdmmc_extracted_folder
 		else
 			dd if=$kernel_image of=$single_image bs=512 \
-				seek=$(( ($kernel_start_dec/512) )) conv=notrunc status=none
+				seek=$(( ($kernel_start_dec/512) )) conv=notrunc
 		fi
 	fi
 }
 
+## Enter current folder
+DIR="$(cd "$(dirname "$0")" && pwd)"
+cd ${DIR}
+
 if [ $# -lt 1 ]
 then
 	usage
-	exit 1
+	exit 0
 fi
 
 ## We set default values for some arguments
@@ -258,8 +252,8 @@ done
 
 ######## Check if variables are valid ########
 check_ok=1
-if ! [[ $platform =~ ^(mt7981abd|mt7981c|mt7986a|mt7986b)$ ]]; then
-	printf "${RED}Platform must be in mt7981abd|mt7981c|mt7986a|mt7986b\n${NC}"
+if ! [[ $platform =~ ^(mt7981abd|mt7981c|mt7986a|mt7986b|mt7988)$ ]]; then
+	printf "${RED}Platform must be in mt7981abd|mt7981c|mt7986a|mt7986b|mt7988\n${NC}"
 	usage
 	exit 1
 fi
@@ -270,7 +264,32 @@ if ! [[ $flash_type =~ ^(snfi-nand|spim-nand|spim-nor|emmc|sd)$ ]]; then
 fi
 
 if [[ $partition_config_default -eq 1 ]]; then
-	partition_config="partitions/${flash_type}-default.yml"
+	declare -A part_by_platform
+	declare -A default_part
+	declare -A mt7988_part
+	##        |  snfi-nand | spim-nand |  spim-nor |   emmc   |    sd
+	## mt7981 |   default  |  default  |   default |  default | default
+	## mt7986 |   default  |  default  |   default |  default | default
+	## mt7988 |   custom   |  custom   |   custom  |  custom  | custom
+	default_part=( ['snfi-nand']="-default"
+				   ['spim-nand']="-default"
+				   ['spim-nor']="-default"
+				   ['emmc']="-default"
+				   ['sd']="-default" )
+	mt7988_part=( ['snfi-nand']="-mt7988"
+				  ['spim-nand']="-mt7988"
+				  ['spim-nor']="-mt7988"
+				  ['emmc']="-mt7988"
+				  ['sd']="-mt7988" )
+	part_by_platform=( ['mt7981abd']="default_part"
+					   ['mt7981c']="default_part"
+					   ['mt7986a']="default_part"
+					   ['mt7986b']="default_part"
+					   ['mt7988']="mt7988_part")
+	#For debugging
+	#eval hey=\${${part_by_platform['mt7988']}['snfi-nand']}
+	eval suffix=\${${part_by_platform[${platform}]}[${flash_type}]}
+	partition_config="./partitions/${flash_type}${suffix}.yml"
 fi
 
 if [[ $flash_type =~ ^(emmc|sd)$ ]] && [[ -z $gpt ]]; then
@@ -306,7 +325,7 @@ then
 fi
 printf "* Partition config: %s\n" $partition_config
 
-if ! [[ -f $bl2_image ]]
+if ! [[ -f $bl2_image ]] && [[ $flash_type != "emmc" ]]
 then
 	if [[ $bl2_default -eq 1 ]]
 	then

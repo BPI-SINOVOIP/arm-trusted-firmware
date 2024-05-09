@@ -260,6 +260,65 @@ static inline bool direct_msg_validate_arg2(uint64_t x2)
 }
 
 /*******************************************************************************
+ * Helper function to validate the destination ID of a direct response.
+ ******************************************************************************/
+static bool direct_msg_validate_dst_id(uint16_t dst_id)
+{
+	struct secure_partition_desc *sp;
+
+	/* Check if we're targeting a normal world partition. */
+	if (ffa_is_normal_world_id(dst_id)) {
+		return true;
+	}
+
+	/* Or directed to the SPMC itself.*/
+	if (dst_id == FFA_SPMC_ID) {
+		return true;
+	}
+
+	/* Otherwise ensure the SP exists. */
+	sp = spmc_get_sp_ctx(dst_id);
+	if (sp != NULL) {
+		return true;
+	}
+
+	return false;
+}
+
+/*******************************************************************************
+ * Helper function to validate the response from a Logical Partition.
+ ******************************************************************************/
+static bool direct_msg_validate_lp_resp(uint16_t origin_id, uint16_t lp_id,
+					void *handle)
+{
+	/* Retrieve populated Direct Response Arguments. */
+	uint64_t x1 = SMC_GET_GP(handle, CTX_GPREG_X1);
+	uint64_t x2 = SMC_GET_GP(handle, CTX_GPREG_X2);
+	uint16_t src_id = ffa_endpoint_source(x1);
+	uint16_t dst_id = ffa_endpoint_destination(x1);
+
+	if (src_id != lp_id) {
+		ERROR("Invalid EL3 LP source ID (0x%x).\n", src_id);
+		return false;
+	}
+
+	/*
+	 * Check the destination ID is valid and ensure the LP is responding to
+	 * the original request.
+	 */
+	if ((!direct_msg_validate_dst_id(dst_id)) || (dst_id != origin_id)) {
+		ERROR("Invalid EL3 LP destination ID (0x%x).\n", dst_id);
+		return false;
+	}
+
+	if (!direct_msg_validate_arg2(x2)) {
+		ERROR("Invalid EL3 LP message encoding.\n");
+		return false;
+	}
+	return true;
+}
+
+/*******************************************************************************
  * Handle direct request messages and route to the appropriate destination.
  ******************************************************************************/
 static uint64_t direct_req_smc_handler(uint32_t smc_fid,
@@ -272,6 +331,7 @@ static uint64_t direct_req_smc_handler(uint32_t smc_fid,
 				       void *handle,
 				       uint64_t flags)
 {
+	uint16_t src_id = ffa_endpoint_source(x1);
 	uint16_t dst_id = ffa_endpoint_destination(x1);
 	struct el3_lp_desc *el3_lp_descs;
 	struct secure_partition_desc *sp;
@@ -283,14 +343,29 @@ static uint64_t direct_req_smc_handler(uint32_t smc_fid,
 					     FFA_ERROR_INVALID_PARAMETER);
 	}
 
+	/* Validate Sender is either the current SP or from the normal world. */
+	if ((secure_origin && src_id != spmc_get_current_sp_ctx()->sp_id) ||
+		(!secure_origin && !ffa_is_normal_world_id(src_id))) {
+		ERROR("Invalid direct request source ID (0x%x).\n", src_id);
+		return spmc_ffa_error_return(handle,
+					FFA_ERROR_INVALID_PARAMETER);
+	}
+
 	el3_lp_descs = get_el3_lp_array();
 
 	/* Check if the request is destined for a Logical Partition. */
 	for (unsigned int i = 0U; i < MAX_EL3_LP_DESCS_COUNT; i++) {
 		if (el3_lp_descs[i].sp_id == dst_id) {
-			return el3_lp_descs[i].direct_req(
-					smc_fid, secure_origin, x1, x2, x3, x4,
-					cookie, handle, flags);
+			uint64_t ret = el3_lp_descs[i].direct_req(
+						smc_fid, secure_origin, x1, x2,
+						x3, x4, cookie, handle, flags);
+			if (!direct_msg_validate_lp_resp(src_id, dst_id,
+							 handle)) {
+				panic();
+			}
+
+			/* Message checks out. */
+			return ret;
 		}
 	}
 
@@ -332,6 +407,7 @@ static uint64_t direct_req_smc_handler(uint32_t smc_fid,
 	 */
 	sp->ec[idx].rt_state = RT_STATE_RUNNING;
 	sp->ec[idx].rt_model = RT_MODEL_DIR_REQ;
+	sp->ec[idx].dir_req_origin_id = src_id;
 	return spmc_smc_return(smc_fid, secure_origin, x1, x2, x3, x4,
 			       handle, cookie, flags, dst_id);
 }
@@ -370,7 +446,7 @@ static uint64_t direct_resp_smc_handler(uint32_t smc_fid,
 	 * Check that the response is either targeted to the Normal world or the
 	 * SPMC e.g. a PM response.
 	 */
-	if ((dst_id != FFA_SPMC_ID) && ffa_is_secure_world_id(dst_id)) {
+	if (!direct_msg_validate_dst_id(dst_id)) {
 		VERBOSE("Direct response to invalid partition ID (0x%x).\n",
 			dst_id);
 		return spmc_ffa_error_return(handle,
@@ -397,8 +473,17 @@ static uint64_t direct_resp_smc_handler(uint32_t smc_fid,
 		return spmc_ffa_error_return(handle, FFA_ERROR_DENIED);
 	}
 
+	if (sp->ec[idx].dir_req_origin_id != dst_id) {
+		WARN("Invalid direct resp partition ID 0x%x != 0x%x on core%u.\n",
+		     dst_id, sp->ec[idx].dir_req_origin_id, idx);
+		return spmc_ffa_error_return(handle, FFA_ERROR_DENIED);
+	}
+
 	/* Update the state of the SP execution context. */
 	sp->ec[idx].rt_state = RT_STATE_WAITING;
+
+	/* Clear the ongoing direct request ID. */
+	sp->ec[idx].dir_req_origin_id = INV_SP_ID;
 
 	/*
 	 * If the receiver is not the SPMC then forward the response to the
@@ -746,6 +831,27 @@ static uint64_t rxtx_unmap_handler(uint32_t smc_fid,
 }
 
 /*
+ * Helper function to populate the properties field of a Partition Info Get
+ * descriptor.
+ */
+static uint32_t
+partition_info_get_populate_properties(uint32_t sp_properties,
+				       enum sp_execution_state sp_ec_state)
+{
+	uint32_t properties = sp_properties;
+	uint32_t ec_state;
+
+	/* Determine the execution state of the SP. */
+	ec_state = sp_ec_state == SP_STATE_AARCH64 ?
+		   FFA_PARTITION_INFO_GET_AARCH64_STATE :
+		   FFA_PARTITION_INFO_GET_AARCH32_STATE;
+
+	properties |= ec_state << FFA_PARTITION_INFO_GET_EXEC_STATE_SHIFT;
+
+	return properties;
+}
+
+/*
  * Collate the partition information in a v1.1 partition information
  * descriptor format, this will be converter later if required.
  */
@@ -771,7 +877,12 @@ static int partition_info_get_handler_v1_1(uint32_t *uuid,
 			desc = &partitions[*partition_count];
 			desc->ep_id = el3_lp_descs[index].sp_id;
 			desc->execution_ctx_count = PLATFORM_CORE_COUNT;
-			desc->properties = el3_lp_descs[index].properties;
+			/* LSPs must be AArch64. */
+			desc->properties =
+				partition_info_get_populate_properties(
+					el3_lp_descs[index].properties,
+					SP_STATE_AARCH64);
+
 			if (null_uuid) {
 				copy_uuid(desc->uuid, el3_lp_descs[index].uuid);
 			}
@@ -794,7 +905,11 @@ static int partition_info_get_handler_v1_1(uint32_t *uuid,
 			 * S-EL1 SPs.
 			 */
 			desc->execution_ctx_count = PLATFORM_CORE_COUNT;
-			desc->properties = sp_desc[index].properties;
+			desc->properties =
+				partition_info_get_populate_properties(
+					sp_desc[index].properties,
+					sp_desc[index].execution_state);
+
 			if (null_uuid) {
 				copy_uuid(desc->uuid, sp_desc[index].uuid);
 			}
@@ -835,7 +950,7 @@ static uint32_t partition_info_get_handler_count_only(uint32_t *uuid)
 
 /*
  * If the caller of the PARTITION_INFO_GET ABI was a v1.0 caller, populate
- * the coresponding descriptor format from the v1.1 descriptor array.
+ * the corresponding descriptor format from the v1.1 descriptor array.
  */
 static uint64_t partition_info_populate_v1_0(struct ffa_partition_info_v1_1
 					     *partitions,
@@ -860,8 +975,10 @@ static uint64_t partition_info_populate_v1_0(struct ffa_partition_info_v1_1
 		v1_0_partitions[index].ep_id = partitions[index].ep_id;
 		v1_0_partitions[index].execution_ctx_count =
 			partitions[index].execution_ctx_count;
+		/* Only report v1.0 properties. */
 		v1_0_partitions[index].properties =
-			partitions[index].properties;
+			(partitions[index].properties &
+			FFA_PARTITION_INFO_GET_PROPERTIES_V1_0_MASK);
 	}
 	return 0;
 }

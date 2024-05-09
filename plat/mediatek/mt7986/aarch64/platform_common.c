@@ -9,7 +9,7 @@
 #include <common/debug.h>
 //#include <drivers/arm/cci.h>
 #include <lib/mmio.h>
-#include <lib/xlat_tables/xlat_tables.h>
+#include <lib/xlat_tables/xlat_tables_v2.h>
 #include <platform_def.h>
 #include <mt7986_mmu.h>
 

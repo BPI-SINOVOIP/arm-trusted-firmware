@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2019, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2014-2019, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -8,8 +8,9 @@
 #include <common/debug.h>
 #include <drivers/console.h>
 #include <plat/arm/common/plat_arm.h>
-#include <plat_private.h>
 #include <platform_tsp.h>
+
+#include <plat_private.h>
 
 /*******************************************************************************
  * Initialize the UART
@@ -21,15 +22,12 @@ void tsp_early_platform_setup(void)
 	 * messages from TSP
 	 */
 	static console_t tsp_boot_console;
-	(void)console_cdns_register(ZYNQMP_UART_BASE,
-				       zynqmp_get_uart_clk(),
-				       ZYNQMP_UART_BAUDRATE,
+	(void)console_cdns_register(UART_BASE,
+				       get_uart_clk(),
+				       UART_BAUDRATE,
 				       &tsp_boot_console);
 	console_set_scope(&tsp_boot_console,
 			  CONSOLE_FLAG_RUNTIME | CONSOLE_FLAG_BOOT);
-
-	/* Initialize the platform config for future decision making */
-	zynqmp_config_setup();
 }
 
 /*******************************************************************************
@@ -43,7 +41,7 @@ void tsp_platform_setup(void)
 
 /*******************************************************************************
  * Perform the very early platform specific architectural setup here. At the
- * moment this is only intializes the MMU
+ * moment this is only initializes the MMU
  ******************************************************************************/
 void tsp_plat_arch_setup(void)
 {

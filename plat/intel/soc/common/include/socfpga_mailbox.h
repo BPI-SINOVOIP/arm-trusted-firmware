@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2022, Intel Corporation. All rights reserved.
+ * Copyright (c) 2019-2023, Intel Corporation. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -9,8 +9,11 @@
 
 #include <lib/utils_def.h>
 
-
+#if PLATFORM_MODEL == PLAT_SOCFPGA_AGILEX5
+#define MBOX_OFFSET					0x10a30000
+#else
 #define MBOX_OFFSET					0xffa30000
+#endif
 
 #define MBOX_ATF_CLIENT_ID				0x1U
 #define MBOX_MAX_JOB_ID					0xFU
@@ -62,6 +65,9 @@
 #define MBOX_CMD_QSPI_CLOSE				0x33
 #define MBOX_CMD_QSPI_SET_CS				0x34
 #define MBOX_CMD_QSPI_DIRECT				0x3B
+
+/* SEU Commands */
+#define MBOX_CMD_SEU_ERR_READ				0x3C
 
 /* RSU Commands */
 #define MBOX_GET_SUBPARTITION_TABLE			0x5A
@@ -129,6 +135,10 @@
 #define MBOX_BUSY					-5
 #define MBOX_TIMEOUT					-2047
 
+/* Key Status */
+#define MBOX_RET_SDOS_DECRYPTION_ERROR_102		-258
+#define MBOX_RET_SDOS_DECRYPTION_ERROR_103		-259
+
 /* Reconfig Status Response */
 #define RECONFIG_STATUS_STATE				0
 #define RECONFIG_STATUS_PIN_STATUS			2
@@ -139,6 +149,7 @@
 #define SOFTFUNC_STATUS_CONF_DONE			(1 << 0)
 #define MBOX_CFGSTAT_STATE_IDLE				0x00000000
 #define MBOX_CFGSTAT_STATE_CONFIG			0x10000000
+#define MBOX_CFGSTAT_VAB_BS_PREAUTH			0x20000000
 #define MBOX_CFGSTAT_STATE_FAILACK			0x08000000
 #define MBOX_CFGSTAT_STATE_ERROR_INVALID		0xf0000001
 #define MBOX_CFGSTAT_STATE_ERROR_CORRUPT		0xf0000002
@@ -185,9 +196,9 @@
 #define RSU_VERSION_ACMF_MASK				0xff00
 
 /* Config Status Macros */
-#define CONFIG_STATUS_WORD_SIZE		16U
-#define CONFIG_STATUS_FW_VER_OFFSET	1
-#define CONFIG_STATUS_FW_VER_MASK	0x00FFFFFF
+#define CONFIG_STATUS_WORD_SIZE			16U
+#define CONFIG_STATUS_FW_VER_OFFSET		1
+#define CONFIG_STATUS_FW_VER_MASK		0x00FFFFFF
 
 /* Data structure */
 
@@ -225,6 +236,7 @@ int iterate_resp(uint32_t mbox_resp_len, uint32_t *resp_buf,
 			unsigned int *resp_len);
 
 void mailbox_reset_cold(void);
+void mailbox_reset_warm(uint32_t reset_type);
 void mailbox_clear_response(void);
 
 int intel_mailbox_get_config_status(uint32_t cmd, bool init_done);
@@ -236,5 +248,6 @@ int mailbox_rsu_update(uint32_t *flash_offset);
 int mailbox_hps_stage_notify(uint32_t execution_stage);
 int mailbox_hwmon_readtemp(uint32_t chan, uint32_t *resp_buf);
 int mailbox_hwmon_readvolt(uint32_t chan, uint32_t *resp_buf);
+int mailbox_seu_err_status(uint32_t *resp_buf, uint32_t resp_buf_len);
 
 #endif /* SOCFPGA_MBOX_H */

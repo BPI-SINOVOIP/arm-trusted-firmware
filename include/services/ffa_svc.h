@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2022, Arm Limited. All rights reserved.
+ * Copyright (c) 2020-2023, Arm Limited. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -24,7 +24,7 @@
 
 /* The macros below are used to identify FFA calls from the SMC function ID */
 #define FFA_FNUM_MIN_VALUE	U(0x60)
-#define FFA_FNUM_MAX_VALUE	U(0x87)
+#define FFA_FNUM_MAX_VALUE	U(0x8C)
 #define is_ffa_fid(fid) __extension__ ({		\
 	__typeof__(fid) _fid = (fid);			\
 	((GET_SMC_NUM(_fid) >= FFA_FNUM_MIN_VALUE) &&	\
@@ -117,6 +117,8 @@
 #define FFA_FNUM_SPM_ID_GET			U(0x85)
 #define FFA_FNUM_MSG_SEND2			U(0x86)
 #define FFA_FNUM_SECONDARY_EP_REGISTER		U(0x87)
+#define FFA_FNUM_PARTITION_INFO_GET_REGS	U(0x8B)
+#define FFA_FNUM_EL3_INTR_HANDLE		U(0x8C)
 
 /* FFA SMC32 FIDs */
 #define FFA_ERROR		FFA_FID(SMC_32, FFA_FNUM_ERROR)
@@ -162,6 +164,7 @@
 #define FFA_MEM_FRAG_TX	FFA_FID(SMC_32, FFA_FNUM_MEM_FRAG_TX)
 #define FFA_SPM_ID_GET		FFA_FID(SMC_32, FFA_FNUM_SPM_ID_GET)
 #define FFA_NORMAL_WORLD_RESUME	FFA_FID(SMC_32, FFA_FNUM_NORMAL_WORLD_RESUME)
+#define FFA_EL3_INTR_HANDLE	FFA_FID(SMC_32, FFA_FNUM_EL3_INTR_HANDLE)
 
 /* FFA SMC64 FIDs */
 #define FFA_ERROR_SMC64		FFA_FID(SMC_64, FFA_FNUM_ERROR)
@@ -180,6 +183,8 @@
 	FFA_FID(SMC_64, FFA_FNUM_SECONDARY_EP_REGISTER)
 #define FFA_NOTIFICATION_INFO_GET_SMC64 \
 	FFA_FID(SMC_64, FFA_FNUM_NOTIFICATION_INFO_GET)
+#define FFA_PARTITION_INFO_GET_REGS_SMC64 \
+	FFA_FID(SMC_64, FFA_FNUM_PARTITION_INFO_GET_REGS)
 
 /*
  * FF-A partition properties values.
@@ -336,6 +341,30 @@ struct ffa_boot_info_header {
 	uint32_t count_boot_info_desc;
 	uint32_t offset_boot_info_desc;
 	uint64_t reserved;
+};
+
+/* FF-A Partition Info Get related macros. */
+#define FFA_PARTITION_INFO_GET_PROPERTIES_V1_0_MASK	U(0x7)
+#define FFA_PARTITION_INFO_GET_EXEC_STATE_SHIFT		U(8)
+#define FFA_PARTITION_INFO_GET_AARCH32_STATE		U(0)
+#define FFA_PARTITION_INFO_GET_AARCH64_STATE		U(1)
+
+/**
+ * Holds information returned for each partition by the FFA_PARTITION_INFO_GET
+ * interface.
+ */
+struct ffa_partition_info_v1_0 {
+	uint16_t ep_id;
+	uint16_t execution_ctx_count;
+	uint32_t properties;
+};
+
+/* Extended structure for FF-A v1.1. */
+struct ffa_partition_info_v1_1 {
+	uint16_t ep_id;
+	uint16_t execution_ctx_count;
+	uint32_t properties;
+	uint32_t uuid[4];
 };
 
 #endif /* FFA_SVC_H */

@@ -7,6 +7,7 @@
 #ifndef PLL_H
 #define PLL_H
 
+#include <stdint.h>
 
 /* APMIXEDSYS Register */
 #define APMIXED_BASE 0x1001E000
@@ -175,6 +176,7 @@ enum {
 #define CLK_CFG_9   0x1001B094
 #define CLK_CFG_20  0x1001B144
 
+uint32_t mt_get_ckgen_ck_freq(uint32_t id);
 void mtk_pll_init(int);
 
 #endif

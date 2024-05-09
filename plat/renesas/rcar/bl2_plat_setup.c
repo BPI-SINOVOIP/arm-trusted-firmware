@@ -236,6 +236,56 @@ static void bl2_lossy_setting(uint32_t no, uint64_t start_addr,
 	       mmio_read_32(AXI_DCMPAREACRA0 + 0x8 * no),
 	       mmio_read_32(AXI_DCMPAREACRB0 + 0x8 * no));
 }
+
+static int bl2_create_reserved_memory(void)
+{
+	int ret;
+
+	int fcnlnode = fdt_add_subnode(fdt, 0, "reserved-memory");
+	if (fcnlnode < 0) {
+		NOTICE("BL2: Cannot create reserved mem node (ret=%i)\n",
+			fcnlnode);
+		panic();
+	}
+
+	ret = fdt_setprop(fdt, fcnlnode, "ranges", NULL, 0);
+	if (ret < 0) {
+		NOTICE("BL2: Cannot add FCNL ranges prop (ret=%i)\n", ret);
+		panic();
+	}
+
+	ret = fdt_setprop_u32(fdt, fcnlnode, "#address-cells", 2);
+	if (ret < 0) {
+		NOTICE("BL2: Cannot add FCNL #address-cells prop (ret=%i)\n", ret);
+		panic();
+	}
+
+	ret = fdt_setprop_u32(fdt, fcnlnode, "#size-cells", 2);
+	if (ret < 0) {
+		NOTICE("BL2: Cannot add FCNL #size-cells prop (ret=%i)\n", ret);
+		panic();
+	}
+
+	return fcnlnode;
+}
+
+static void bl2_create_fcnl_reserved_memory(void)
+{
+	int fcnlnode;
+
+	NOTICE("BL2: Lossy Decomp areas\n");
+
+	fcnlnode = bl2_create_reserved_memory();
+
+	bl2_lossy_setting(0, LOSSY_ST_ADDR0, LOSSY_END_ADDR0,
+			  LOSSY_FMT0, LOSSY_ENA_DIS0, fcnlnode);
+	bl2_lossy_setting(1, LOSSY_ST_ADDR1, LOSSY_END_ADDR1,
+			  LOSSY_FMT1, LOSSY_ENA_DIS1, fcnlnode);
+	bl2_lossy_setting(2, LOSSY_ST_ADDR2, LOSSY_END_ADDR2,
+			  LOSSY_FMT2, LOSSY_ENA_DIS2, fcnlnode);
+}
+#else
+static void bl2_create_fcnl_reserved_memory(void) {}
 #endif
 
 void bl2_plat_flush_bl31_params(void)
@@ -574,7 +624,7 @@ static void bl2_add_rpc_node(void)
 		goto err;
 	}
 
-	node = ret = fdt_add_subnode(fdt, node, "rpc@ee200000");
+	node = ret = fdt_add_subnode(fdt, node, "spi@ee200000");
 	if (ret < 0) {
 		goto err;
 	}
@@ -819,9 +869,6 @@ void bl2_el3_early_platform_setup(u_register_t arg1, u_register_t arg2,
 	const char *boot_hyper160 = "HyperFlash(150MHz)";
 #else
 	const char *boot_hyper160 = "HyperFlash(160MHz)";
-#endif
-#if (RCAR_LOSSY_ENABLE == 1)
-	int fcnlnode;
 #endif
 
 	bl2_init_generic_timer();
@@ -1099,23 +1146,8 @@ lcm_state:
 		reg &= ~((uint32_t) 1 << 12);
 		mmio_write_32(CPG_PLL0CR, reg);
 	}
-#if (RCAR_LOSSY_ENABLE == 1)
-	NOTICE("BL2: Lossy Decomp areas\n");
 
-	fcnlnode = fdt_add_subnode(fdt, 0, "reserved-memory");
-	if (fcnlnode < 0) {
-		NOTICE("BL2: Cannot create reserved mem node (ret=%i)\n",
-			fcnlnode);
-		panic();
-	}
-
-	bl2_lossy_setting(0, LOSSY_ST_ADDR0, LOSSY_END_ADDR0,
-			  LOSSY_FMT0, LOSSY_ENA_DIS0, fcnlnode);
-	bl2_lossy_setting(1, LOSSY_ST_ADDR1, LOSSY_END_ADDR1,
-			  LOSSY_FMT1, LOSSY_ENA_DIS1, fcnlnode);
-	bl2_lossy_setting(2, LOSSY_ST_ADDR2, LOSSY_END_ADDR2,
-			  LOSSY_FMT2, LOSSY_ENA_DIS2, fcnlnode);
-#endif
+	bl2_create_fcnl_reserved_memory();
 
 	fdt_pack(fdt);
 	NOTICE("BL2: FDT at %p\n", fdt);
@@ -1190,7 +1222,7 @@ static void bl2_init_generic_timer(void)
 		break;
 	}
 #endif /* RCAR_LSI == RCAR_E3 */
-	/* Update memory mapped and register based freqency */
+	/* Update memory mapped and register based frequency */
 	write_cntfrq_el0((u_register_t )reg_cntfid);
 	mmio_write_32(ARM_SYS_CNTCTL_BASE + (uintptr_t)CNTFID_OFF, reg_cntfid);
 	/* Enable counter */

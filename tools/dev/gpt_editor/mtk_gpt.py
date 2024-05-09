@@ -158,20 +158,29 @@ def create_gpt(in_path, out_path, sdmmc=False):
         partition_data = jobj[name]
         assert "start" in partition_data
         assert "end" in partition_data
-        new_uuid = None
-        if "uuid" in partition_data:
+
+        entry = get_template_GPT_entry()
+        assert entry != None
+        if "part_type_guid" in partition_data:
             try:
-                new_uuid = uuid.UUID(partition_data["uuid"]).bytes_le
+                entry.partition_type_guid = uuid.UUID(partition_data["part_type_guid"]).bytes_le
+            except:
+                print(
+                    "[ERROR] unable to parse partition type GUID '%s'"
+                    % partition_data["part_type_guid"]
+                )
+
+        if "unique_part_guid" in partition_data:
+            try:
+                entry.unique_guid = uuid.UUID(partition_data["unique_part_guid"]).bytes_le
             except:
                 print(
                     "[ERROR] unable to parse uuid '%s'"
-                    % partition__data["uuid"]
+                    % partition_data["unique_part_guid"]
                 )
         else:
-            new_uuid = uuid.uuid1().bytes_le
-        entry = get_template_GPT_entry()
-        assert entry != None
-        entry.unique_guid = new_uuid
+            entry.unique_guid = uuid.uuid1().bytes_le
+
         # convert ascii json partition name like "fip" into unicode version bytes
         # "f.i.p." ['f', 0x00, 'i', 0x00, 'p', 0x00]
         entry.name = to_mtk_partition_name(name)

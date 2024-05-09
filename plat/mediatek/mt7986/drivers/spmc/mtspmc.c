@@ -30,9 +30,9 @@
 #include <assert.h>
 #include <lib/mmio.h>
 #include <mtspmc.h>
+#include <platform_def.h>
 #include <mtspmc_private.h>
 #include <plat_private.h>
-#include <platform_def.h>
 
 unsigned int cpu_bitmask;
 

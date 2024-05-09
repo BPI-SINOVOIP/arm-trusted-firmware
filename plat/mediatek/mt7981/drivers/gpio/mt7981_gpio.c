@@ -31,15 +31,19 @@ static void mt_set_pinmux_mode_chip(uint32_t pin, int mode)
 	uint32_t mask = (1L << GPIO_MODE_BITS) - 1;
 
 	assert(pin < MAX_GPIO_PIN);
-	assert(dir < MT_GPIO_DIR_MAX);
 
 	pos = pin / MAX_GPIO_MODE_PER_REG;
 	mode &= mask;
 	bit = pin % MAX_GPIO_MODE_PER_REG;
-	val = (mode << (GPIO_MODE_BITS * bit));
 
-	mmio_write_32(MODE_BASE + 0x10U * pos + CLR, (mask << (GPIO_MODE_BITS * bit)));
-	mmio_write_32(MODE_BASE + 0x10U * pos + SET, val);
+	val = mmio_read_32(MODE_BASE + 0x10U * pos);
+
+	if (((val >> (GPIO_MODE_BITS * bit)) & mask) != mode) {
+		val &= ~(mask << (GPIO_MODE_BITS * bit));
+		val |= (mode << (GPIO_MODE_BITS * bit));
+
+		mmio_write_32(MODE_BASE + 0x10U * pos, val);
+	}
 }
 
 static int mt_get_pinmux_mode_chip(uint32_t pin)

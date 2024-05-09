@@ -169,16 +169,21 @@ static const struct mt_pin_info mt7986_pin_infos[] = {
 
 static void mt_set_pinmux_mode(int gpio, int mode)
 {
-	uint32_t pos, bit;
+	uint32_t pos, bit, val;
 
 	assert(gpio < MAX_GPIO_PIN);
 
 	pos = gpio / GPIO_MODE_PINS_PER_REG;
 	bit = gpio % GPIO_MODE_PINS_PER_REG;
 
-	mmio_write_32(GPIO_MODE_CLR_REG(pos),
-		      GPIO_MODE_SET(GPIO_MODE_MASK, bit));
-	mmio_write_32(GPIO_MODE_SET_REG(pos), GPIO_MODE_SET(mode, bit));
+	val = mmio_read_32(GPIO_MODE_REG(pos));
+
+	if (GPIO_MODE_GET(val, bit) != mode) {
+		val &= ~(GPIO_MODE_MASK << bit);
+		val |= GPIO_MODE_SET(mode, bit);
+
+		mmio_write_32(GPIO_MODE_REG(pos), val);
+	}
 }
 
 static int mt_get_pinmux_mode(int gpio)

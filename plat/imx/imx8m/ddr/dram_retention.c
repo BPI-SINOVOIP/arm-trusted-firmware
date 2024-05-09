@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022 NXP
+ * Copyright 2018-2023 NXP
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -8,22 +8,45 @@
 #include <lib/mmio.h>
 
 #include <dram.h>
+#include <gpc_reg.h>
 #include <platform_def.h>
 
 #define SRC_DDR1_RCR		(IMX_SRC_BASE + 0x1000)
 #define SRC_DDR2_RCR		(IMX_SRC_BASE + 0x1004)
 
-#define PU_PGC_UP_TRG		0xf8
-#define PU_PGC_DN_TRG		0x104
-#define GPC_PU_PWRHSK		(IMX_GPC_BASE + 0x01FC)
 #define CCM_SRC_CTRL_OFFSET     (IMX_CCM_BASE + 0x800)
 #define CCM_CCGR_OFFSET         (IMX_CCM_BASE + 0x4000)
+#define CCM_TARGET_ROOT_OFFSET	(IMX_CCM_BASE + 0x8000)
 #define CCM_SRC_CTRL(n)		(CCM_SRC_CTRL_OFFSET + 0x10 * (n))
 #define CCM_CCGR(n)		(CCM_CCGR_OFFSET + 0x10 * (n))
-
-#define DRAM_PLL_CTRL		(IMX_ANAMIX_BASE + 0x50)
+#define CCM_TARGET_ROOT(n)	(CCM_TARGET_ROOT_OFFSET + 0x80 * (n))
 
 #define DBGCAM_EMPTY		0x36000000
+
+static void rank_setting_update(void)
+{
+	uint32_t i, offset;
+	uint32_t pstate_num = dram_info.num_fsp;
+
+	/* only support maximum 3 setpoints */
+	pstate_num = (pstate_num > MAX_FSP_NUM) ? MAX_FSP_NUM : pstate_num;
+
+	for (i = 0U; i < pstate_num; i++) {
+		offset = i ? (i + 1) * 0x1000 : 0U;
+		mmio_write_32(DDRC_DRAMTMG2(0) + offset, dram_info.rank_setting[i][0]);
+		if (dram_info.dram_type != DDRC_LPDDR4) {
+			mmio_write_32(DDRC_DRAMTMG9(0) + offset, dram_info.rank_setting[i][1]);
+		}
+
+#if !defined(PLAT_imx8mq)
+		mmio_write_32(DDRC_RANKCTL(0) + offset,
+			dram_info.rank_setting[i][2]);
+#endif
+	}
+#if defined(PLAT_imx8mq)
+		mmio_write_32(DDRC_RANKCTL(0), dram_info.rank_setting[0][2]);
+#endif
+}
 
 void dram_enter_retention(void)
 {
@@ -77,21 +100,12 @@ void dram_enter_retention(void)
 	}
 	dwc_ddrphy_apb_wr(0xd0000, 0x1);
 
-#if defined(PLAT_imx8mq)
 	/* pwrdnreqn_async adbm/adbs of ddr */
-	mmio_clrbits_32(GPC_PU_PWRHSK, BIT(1));
-	while (mmio_read_32(GPC_PU_PWRHSK) & BIT(18)) {
+	mmio_clrbits_32(IMX_GPC_BASE + GPC_PU_PWRHSK, DDRMIX_ADB400_SYNC);
+	while (mmio_read_32(IMX_GPC_BASE + GPC_PU_PWRHSK) & DDRMIX_ADB400_ACK)
 		;
-	}
-	mmio_setbits_32(GPC_PU_PWRHSK, BIT(1));
-#else
-	/* pwrdnreqn_async adbm/adbs of ddr */
-	mmio_clrbits_32(GPC_PU_PWRHSK, BIT(2));
-	while (mmio_read_32(GPC_PU_PWRHSK) & BIT(20)) {
-		;
-	}
-	mmio_setbits_32(GPC_PU_PWRHSK, BIT(2));
-#endif
+	mmio_setbits_32(IMX_GPC_BASE + GPC_PU_PWRHSK, DDRMIX_ADB400_SYNC);
+
 	/* remove PowerOk */
 	mmio_write_32(SRC_DDR1_RCR, 0x8F000008);
 
@@ -99,8 +113,8 @@ void dram_enter_retention(void)
 	mmio_write_32(CCM_SRC_CTRL(15), 2);
 
 	/* enable the phy iso */
-	mmio_setbits_32(IMX_GPC_BASE + 0xd40, 1);
-	mmio_setbits_32(IMX_GPC_BASE + PU_PGC_DN_TRG, BIT(5));
+	mmio_setbits_32(IMX_GPC_BASE + DDRMIX_PGC, 1);
+	mmio_setbits_32(IMX_GPC_BASE + PU_PGC_DN_TRG, DDRMIX_PWR_REQ);
 
 	VERBOSE("dram enter retention\n");
 }
@@ -120,8 +134,12 @@ void dram_exit_retention(void)
 	mmio_write_32(CCM_CCGR(5), 2);
 	mmio_write_32(CCM_SRC_CTRL(15), 2);
 
+	/* change the clock source of dram_apb_clk_root */
+	mmio_write_32(CCM_TARGET_ROOT(65) + 0x8, (0x7 << 24) | (0x7 << 16));
+	mmio_write_32(CCM_TARGET_ROOT(65) + 0x4, (0x4 << 24) | (0x3 << 16));
+
 	/* disable iso */
-	mmio_setbits_32(IMX_GPC_BASE + PU_PGC_UP_TRG, BIT(5));
+	mmio_setbits_32(IMX_GPC_BASE + PU_PGC_UP_TRG, DDRMIX_PWR_REQ);
 	mmio_write_32(SRC_DDR1_RCR, 0x8F000006);
 
 	/* wait dram pll locked */
@@ -156,6 +174,9 @@ void dram_exit_retention(void)
 
 	/* dram phy re-init */
 	dram_phy_init(dram_info.timing_info);
+
+	/* workaround for rank-to-rank issue */
+	rank_setting_update();
 
 	/* DWC_DDRPHYA_APBONLY0_MicroContMuxSel */
 	dwc_ddrphy_apb_wr(0xd0000, 0x0);

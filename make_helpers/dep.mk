@@ -33,8 +33,7 @@ endef
 #   $(2) = dependency header file path
 #   $(3) = list of dependency variable names
 define CHECK_DEP
-.PHONY: $(BUILD_PLAT)/$(1)/$(2).cfg.h
-$(BUILD_PLAT)/$(1)/$(2).cfg.h:
+$(BUILD_PLAT)/$(1)/$(2).cfg.h::
 	${Q}mkdir -p $(BUILD_PLAT)/$(1); \
 	echo "$(call GEN_DEP_HEADER_TEXT,$(3))" > $(BUILD_PLAT)/$(1)/$(2).cfg-new.h; \
 	if ! test -f $(BUILD_PLAT)/$(1)/$(2).cfg.h; then \

@@ -8,6 +8,7 @@
 #include <drivers/arm/gic600_multichip.h>
 #include <plat/arm/common/plat_arm.h>
 #include <plat/common/platform.h>
+#include <rdn2_ras.h>
 #include <sgi_soc_platform_def_v2.h>
 #include <sgi_plat.h>
 
@@ -47,15 +48,15 @@ static struct gic600_multichip_data rdn2mc_multichip_data __init = {
 #endif
 	},
 	.spi_ids = {
-		{32, 479},
+		{PLAT_ARM_GICD_BASE, 32, 511},
 	#if CSS_SGI_CHIP_COUNT > 1
-		{0, 0},
+		{PLAT_ARM_GICD_BASE, 512, 991},
 	#endif
 	#if CSS_SGI_CHIP_COUNT > 2
-		{0, 0},
+		{PLAT_ARM_GICD_BASE, 4096, 4575},
 	#endif
 	#if CSS_SGI_CHIP_COUNT > 3
-		{0, 0},
+		{PLAT_ARM_GICD_BASE, 4576, 5055},
 	#endif
 	}
 };
@@ -134,5 +135,9 @@ void bl31_platform_setup(void)
 #endif
 
 	sgi_bl31_common_platform_setup();
+
+#if RAS_FFH_SUPPORT
+	sgi_ras_platform_setup(&ras_config);
+#endif
 }
 #endif /* IMAGE_BL31 */

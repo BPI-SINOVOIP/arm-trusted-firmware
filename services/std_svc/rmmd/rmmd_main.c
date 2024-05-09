@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2021-2023, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -18,6 +18,8 @@
 #include <context.h>
 #include <lib/el3_runtime/context_mgmt.h>
 #include <lib/el3_runtime/pubsub.h>
+#include <lib/extensions/pmuv3.h>
+#include <lib/extensions/sys_reg_trace.h>
 #include <lib/gpt_rme/gpt_rme.h>
 
 #include <lib/spinlock.h>
@@ -28,6 +30,7 @@
 #include <platform_def.h>
 #include <services/rmmd_svc.h>
 #include <smccc_helpers.h>
+#include <lib/extensions/sme.h>
 #include <lib/extensions/sve.h>
 #include "rmmd_initial_context.h"
 #include "rmmd_private.h"
@@ -117,19 +120,31 @@ static void rmm_el2_context_init(el2_sysregs_t *regs)
  ******************************************************************************/
 static void manage_extensions_realm(cpu_context_t *ctx)
 {
-#if ENABLE_SVE_FOR_NS
+	if (is_feat_sve_supported()) {
 	/*
 	 * Enable SVE and FPU in realm context when it is enabled for NS.
 	 * Realm manager must ensure that the SVE and FPU register
 	 * contexts are properly managed.
 	 */
-	sve_enable(ctx);
-#else
+		sve_enable(ctx);
+	}
+
+	/* NS can access this but Realm shouldn't */
+	if (is_feat_sys_reg_trace_supported()) {
+		sys_reg_trace_disable(ctx);
+	}
+
+	pmuv3_enable(ctx);
+
 	/*
-	 * Disable SVE and FPU in realm context when it is disabled for NS.
+	 * If SME/SME2 is supported and enabled for NS world, then enables SME
+	 * for Realm world. RMM will save/restore required registers that are
+	 * shared with SVE/FPU so that Realm can use FPU or SVE.
 	 */
-	sve_disable(ctx);
-#endif /* ENABLE_SVE_FOR_NS */
+	if (is_feat_sme_supported()) {
+		/* sme_enable() also enables SME2 if supported by hardware */
+		sme_enable(ctx);
+	}
 }
 
 /*******************************************************************************
@@ -171,7 +186,7 @@ int rmmd_setup(void)
 	uint32_t ep_attr;
 	unsigned int linear_id = plat_my_core_pos();
 	rmmd_rmm_context_t *rmm_ctx = &rmm_context[linear_id];
-	rmm_manifest_t *manifest;
+	struct rmm_manifest *manifest;
 	int rc;
 
 	/* Make sure RME is supported. */
@@ -206,7 +221,7 @@ int rmmd_setup(void)
 					((void *)shared_buf_base != NULL));
 
 	/* Load the boot manifest at the beginning of the shared area */
-	manifest = (rmm_manifest_t *)shared_buf_base;
+	manifest = (struct rmm_manifest *)shared_buf_base;
 	rc = plat_rmmd_load_manifest(manifest);
 	if (rc != 0) {
 		ERROR("Error loading RMM Boot Manifest (%i)\n", rc);
@@ -242,10 +257,12 @@ int rmmd_setup(void)
  * Forward SMC to the other security state
  ******************************************************************************/
 static uint64_t	rmmd_smc_forward(uint32_t src_sec_state,
-					uint32_t dst_sec_state, uint64_t x0,
-					uint64_t x1, uint64_t x2, uint64_t x3,
-					uint64_t x4, void *handle)
+				 uint32_t dst_sec_state, uint64_t x0,
+				 uint64_t x1, uint64_t x2, uint64_t x3,
+				 uint64_t x4, void *handle)
 {
+	cpu_context_t *ctx = cm_get_context(dst_sec_state);
+
 	/* Save incoming security state */
 	cm_el1_sysregs_context_save(src_sec_state);
 	cm_el2_sysregs_context_save(src_sec_state);
@@ -256,19 +273,21 @@ static uint64_t	rmmd_smc_forward(uint32_t src_sec_state,
 	cm_set_next_eret_context(dst_sec_state);
 
 	/*
-	 * As per SMCCCv1.1, we need to preserve x4 to x7 unless
+	 * As per SMCCCv1.2, we need to preserve x4 to x7 unless
 	 * being used as return args. Hence we differentiate the
 	 * onward and backward path. Support upto 8 args in the
 	 * onward path and 4 args in return path.
+	 * Register x4 will be preserved by RMM in case it is not
+	 * used in return path.
 	 */
 	if (src_sec_state == NON_SECURE) {
-		SMC_RET8(cm_get_context(dst_sec_state), x0, x1, x2, x3, x4,
-				SMC_GET_GP(handle, CTX_GPREG_X5),
-				SMC_GET_GP(handle, CTX_GPREG_X6),
-				SMC_GET_GP(handle, CTX_GPREG_X7));
-	} else {
-		SMC_RET4(cm_get_context(dst_sec_state), x0, x1, x2, x3);
+		SMC_RET8(ctx, x0, x1, x2, x3, x4,
+			 SMC_GET_GP(handle, CTX_GPREG_X5),
+			 SMC_GET_GP(handle, CTX_GPREG_X6),
+			 SMC_GET_GP(handle, CTX_GPREG_X7));
 	}
+
+	SMC_RET5(ctx, x0, x1, x2, x3, x4);
 }
 
 /*******************************************************************************
@@ -276,8 +295,8 @@ static uint64_t	rmmd_smc_forward(uint32_t src_sec_state,
  * either forwarded to the other security state or handled by the RMM dispatcher
  ******************************************************************************/
 uint64_t rmmd_rmi_handler(uint32_t smc_fid, uint64_t x1, uint64_t x2,
-				uint64_t x3, uint64_t x4, void *cookie,
-				void *handle, uint64_t flags)
+			  uint64_t x3, uint64_t x4, void *cookie,
+			  void *handle, uint64_t flags)
 {
 	uint32_t src_sec_state;
 
@@ -301,6 +320,14 @@ uint64_t rmmd_rmi_handler(uint32_t smc_fid, uint64_t x1, uint64_t x2,
 	 * is.
 	 */
 	if (src_sec_state == SMC_FROM_NON_SECURE) {
+		/*
+		 * If SVE hint bit is set in the flags then update the SMC
+		 * function id and pass it on to the lower EL.
+		 */
+		if (is_sve_hint_set(flags)) {
+			smc_fid |= (FUNCID_SVE_HINT_MASK <<
+				    FUNCID_SVE_HINT_SHIFT);
+		}
 		VERBOSE("RMMD: RMI call from non-secure world.\n");
 		return rmmd_smc_forward(NON_SECURE, REALM, smc_fid,
 					x1, x2, x3, x4, handle);
@@ -311,10 +338,12 @@ uint64_t rmmd_rmi_handler(uint32_t smc_fid, uint64_t x1, uint64_t x2,
 	}
 
 	switch (smc_fid) {
-	case RMM_RMI_REQ_COMPLETE:
-		return rmmd_smc_forward(REALM, NON_SECURE, x1,
-					x2, x3, x4, 0, handle);
+	case RMM_RMI_REQ_COMPLETE: {
+		uint64_t x5 = SMC_GET_GP(handle, CTX_GPREG_X5);
 
+		return rmmd_smc_forward(REALM, NON_SECURE, x1,
+					x2, x3, x4, x5, handle);
+	}
 	default:
 		WARN("RMMD: Unsupported RMM call 0x%08x\n", smc_fid);
 		SMC_RET1(handle, SMC_UNK);

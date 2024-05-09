@@ -1186,8 +1186,9 @@ XZ_EXTERN enum xz_ret xz_dec_lzma2_reset(struct xz_dec_lzma2 *s, uint8_t props)
 
 XZ_EXTERN void xz_dec_lzma2_end(struct xz_dec_lzma2 *s)
 {
-	if (DEC_IS_MULTI(s->dict.mode))
+	if (DEC_IS_MULTI(s->dict.mode)) {
 		vfree(s->dict.buf);
+	}
 
 	kfree(s);
 }

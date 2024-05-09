@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2022, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015-2023, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -19,6 +19,8 @@
 #include <drivers/fwu/fwu.h>
 #include <lib/fconf/fconf_tbbr_getter.h>
 #include <plat/common/platform.h>
+
+#include <tools_share/zero_oid.h>
 
 /* ASN.1 tags */
 #define ASN1_INTEGER                 0x02
@@ -153,8 +155,8 @@ static int auth_signature(const auth_method_param_sig_t *param,
 			  const auth_img_desc_t *img_desc,
 			  void *img, unsigned int img_len)
 {
-	void *data_ptr, *pk_ptr, *pk_hash_ptr, *sig_ptr, *sig_alg_ptr;
-	unsigned int data_len, pk_len, pk_hash_len, sig_len, sig_alg_len;
+	void *data_ptr, *pk_ptr, *cnv_pk_ptr, *pk_plat_ptr, *sig_ptr, *sig_alg_ptr, *pk_oid;
+	unsigned int data_len, pk_len, cnv_pk_len, pk_plat_len, sig_len, sig_alg_len;
 	unsigned int flags = 0;
 	int rc = 0;
 
@@ -176,47 +178,87 @@ static int auth_signature(const auth_method_param_sig_t *param,
 	/* Get the public key from the parent. If there is no parent (NULL),
 	 * the certificate has been signed with the ROTPK, so we have to get
 	 * the PK from the platform */
-	if (img_desc->parent) {
+	if (img_desc->parent != NULL) {
 		rc = auth_get_param(param->pk, img_desc->parent,
 				&pk_ptr, &pk_len);
+		return_if_error(rc);
 	} else {
-		rc = plat_get_rotpk_info(param->pk->cookie, &pk_ptr, &pk_len,
-				&flags);
-	}
-	return_if_error(rc);
+		/*
+		 * Root certificates are signed with the ROTPK, so we have to
+		 * get it from the platform.
+		 */
+		rc = plat_get_rotpk_info(param->pk->cookie, &pk_plat_ptr,
+					 &pk_plat_len, &flags);
+		return_if_error(rc);
 
-	if (flags & (ROTPK_IS_HASH | ROTPK_NOT_DEPLOYED)) {
-		/* If the PK is a hash of the key or if the ROTPK is not
-		   deployed on the platform, retrieve the key from the image */
-		pk_hash_ptr = pk_ptr;
-		pk_hash_len = pk_len;
+		assert(is_rotpk_flags_valid(flags));
+
+		/* Also retrieve the key from the image. */
 		rc = img_parser_get_auth_param(img_desc->img_type,
-					param->pk, img, img_len,
-					&pk_ptr, &pk_len);
+					       param->pk, img, img_len,
+					       &pk_ptr, &pk_len);
 		return_if_error(rc);
 
-		/* Ask the crypto module to verify the signature */
-		rc = crypto_mod_verify_signature(data_ptr, data_len,
-						 sig_ptr, sig_len,
-						 sig_alg_ptr, sig_alg_len,
-						 pk_ptr, pk_len);
-		return_if_error(rc);
-
-		if (flags & ROTPK_NOT_DEPLOYED) {
+		/*
+		 * Validate the certificate's key against the platform ROTPK.
+		 *
+		 * Platform may store key in one of the following way -
+		 * 1. Hash of ROTPK
+		 * 2. Hash if prefixed, suffixed or modified ROTPK
+		 * 3. Full ROTPK
+		 */
+		if ((flags & ROTPK_NOT_DEPLOYED) != 0U) {
 			NOTICE("ROTPK is not deployed on platform. "
 				"Skipping ROTPK verification.\n");
+		} else if ((flags & ROTPK_IS_HASH) != 0U) {
+			/*
+			 * platform may store the hash of a prefixed,
+			 * suffixed or modified pk
+			 */
+			rc = crypto_mod_convert_pk(pk_ptr, pk_len, &cnv_pk_ptr, &cnv_pk_len);
+			return_if_error(rc);
+
+			/*
+			 * The hash of the certificate's public key must match
+			 * the hash of the ROTPK.
+			 */
+			rc = crypto_mod_verify_hash(cnv_pk_ptr, cnv_pk_len,
+						    pk_plat_ptr, pk_plat_len);
+			return_if_error(rc);
 		} else {
-			/* Ask the crypto-module to verify the key hash */
-			rc = crypto_mod_verify_hash(pk_ptr, pk_len,
-				    pk_hash_ptr, pk_hash_len);
+			/* Platform supports full ROTPK */
+			if ((pk_len != pk_plat_len) ||
+			    (memcmp(pk_plat_ptr, pk_ptr, pk_len) != 0)) {
+				ERROR("plat and cert ROTPK len mismatch\n");
+				return -1;
+			}
 		}
-	} else {
-		/* Ask the crypto module to verify the signature */
-		rc = crypto_mod_verify_signature(data_ptr, data_len,
-						 sig_ptr, sig_len,
-						 sig_alg_ptr, sig_alg_len,
-						 pk_ptr, pk_len);
+
+		/*
+		 * Set Zero-OID for ROTPK(subject key) as a the certificate
+		 * does not hold Key-OID information for ROTPK.
+		 */
+		if (param->pk->cookie != NULL) {
+			pk_oid = param->pk->cookie;
+		} else {
+			pk_oid = ZERO_OID;
+		}
+
+		/*
+		 * Public key is verified at this stage, notify platform
+		 * to measure and publish it.
+		 */
+		rc = plat_mboot_measure_key(pk_oid, pk_ptr, pk_len);
+		if (rc != 0) {
+			WARN("Public Key measurement failure = %d\n", rc);
+		}
 	}
+
+	/* Ask the crypto module to verify the signature */
+	rc = crypto_mod_verify_signature(data_ptr, data_len,
+					 sig_ptr, sig_len,
+					 sig_alg_ptr, sig_alg_len,
+					 pk_ptr, pk_len);
 
 	return rc;
 }
@@ -242,7 +284,7 @@ static int auth_nvctr(const auth_method_param_nv_ctr_t *param,
 		      unsigned int *cert_nv_ctr,
 		      bool *need_nv_ctr_upgrade)
 {
-	char *p;
+	unsigned char *p;
 	void *data_ptr = NULL;
 	unsigned int data_len, len, i;
 	unsigned int plat_nv_ctr;
@@ -257,16 +299,24 @@ static int auth_nvctr(const auth_method_param_nv_ctr_t *param,
 
 	/* Parse the DER encoded integer */
 	assert(data_ptr);
-	p = (char *)data_ptr;
-	if (*p != ASN1_INTEGER) {
+	p = (unsigned char *)data_ptr;
+
+	/*
+	 * Integers must be at least 3 bytes: 1 for tag, 1 for length, and 1
+	 * for value.  The first byte (tag) must be ASN1_INTEGER.
+	 */
+	if ((data_len < 3) || (*p != ASN1_INTEGER)) {
 		/* Invalid ASN.1 integer */
 		return 1;
 	}
 	p++;
 
-	/* NV-counters are unsigned integers up to 32-bit */
-	len = (unsigned int)(*p & 0x7f);
-	if ((*p & 0x80) || (len > 4)) {
+	/*
+	 * NV-counters are unsigned integers up to 31 bits.  Trailing
+	 * padding is not allowed.
+	 */
+	len = (unsigned int)*p;
+	if ((len > 4) || (data_len - 2 != len)) {
 		return 1;
 	}
 	p++;
@@ -296,15 +346,13 @@ static int auth_nvctr(const auth_method_param_nv_ctr_t *param,
 		       *cert_nv_ctr, plat_nv_ctr);
 		return 1;
 	} else if (*cert_nv_ctr > plat_nv_ctr) {
-		NOTICE("Verifying BL Anti-Rollback Version ... bl_ar_ver:%u>%u+ OK\n",
-		       *cert_nv_ctr, plat_nv_ctr);
 #if PSA_FWU_SUPPORT && IMAGE_BL2
 		is_trial_run = fwu_is_trial_run_state();
 #endif /* PSA_FWU_SUPPORT && IMAGE_BL2 */
 		*need_nv_ctr_upgrade = !is_trial_run;
 	}
 
-	NOTICE("Verifying BL Anti-Rollback Version ... bl_ar_ver:%u=%u+ OK\n",
+	NOTICE("Verifying BL Anti-Rollback Version ... bl_ar_ver:%u>=%u+ OK\n",
 	       *cert_nv_ctr, plat_nv_ctr);
 	return 0;
 }
@@ -367,6 +415,7 @@ int auth_mod_verify_img(unsigned int img_id,
 			unsigned int img_len)
 {
 	const auth_img_desc_t *img_desc = NULL;
+	const auth_param_type_desc_t *type_desc = NULL;
 	const auth_method_desc_t *auth_method = NULL;
 	void *param_ptr;
 	unsigned int param_len;
@@ -448,6 +497,21 @@ int auth_mod_verify_img(unsigned int img_id,
 			/* Copy the parameter for later use */
 			memcpy((void *)img_desc->authenticated_data[i].data.ptr,
 					(void *)param_ptr, param_len);
+
+			/*
+			 * If this is a public key then measure and publicise
+			 * it.
+			 */
+			type_desc = img_desc->authenticated_data[i].type_desc;
+			if (type_desc->type == AUTH_PARAM_PUB_KEY) {
+				rc = plat_mboot_measure_key(type_desc->cookie,
+							    param_ptr,
+							    param_len);
+				if (rc != 0) {
+					WARN("Public Key measurement "
+					     "failure = %d\n", rc);
+				}
+			}
 		}
 	}
 

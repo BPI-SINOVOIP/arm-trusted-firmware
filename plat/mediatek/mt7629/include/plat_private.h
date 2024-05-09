@@ -22,6 +22,7 @@ void plat_cci_enable(void);
 void plat_cci_disable(void);
 
 uint32_t plat_uart_clock(void);
+#define UART_CLOCK		plat_uart_clock()
 
 /* Declarations for plat_topology.c */
 int mt_setup_topology(void);
