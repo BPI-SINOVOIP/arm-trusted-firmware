@@ -1,6 +1,5 @@
 /*
  * Copyright (c) 2019, ARM Limited. All rights reserved.
- * Copyright (c) 2023, NVIDIA Corporation. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -16,11 +15,8 @@
  */
 #define GIC600_MAX_MULTICHIP	16
 
-typedef struct multichip_spi_ids_desc {
-	uintptr_t gicd_base;
-	uint32_t spi_id_min;
-	uint32_t spi_id_max;
-} multichip_spi_ids_desc_t;
+/* SPI IDs array consist of min and max ids */
+#define GIC600_SPI_IDS_SIZE	2
 
 /*******************************************************************************
  * GIC-600 multichip data structure describes platform specific attributes
@@ -41,23 +37,19 @@ typedef struct multichip_spi_ids_desc {
  * The 'chip_addrs' field contains array of chip addresses. These addresses are
  * implementation specific values.
  *
- * The 'multichip_spi_ids_desc_t' field contains array of descriptors used to
- * provide minimum and maximum SPI interrupt ids that each chip owns and the
- * corresponding chip base address. Note that SPI interrupt ids can range from
- * 32 to 960 and it should be group of 32 (i.e., SPI minimum and (SPI maximum +
- * 1) should be a multiple of 32). If a chip doesn't own any SPI interrupts a
- * value of {0, 0, 0} should be passed.
+ * The 'spi_ids' field contains array of minimum and maximum SPI interrupt ids
+ * that each chip owns. Note that SPI interrupt ids can range from 32 to 960 and
+ * it should be group of 32 (i.e., SPI minimum and (SPI maximum + 1) should be
+ * a multiple of 32). If a chip doesn't own any SPI interrupts a value of {0, 0}
+ * should be passed.
  ******************************************************************************/
 struct gic600_multichip_data {
 	uintptr_t rt_owner_base;
 	unsigned int rt_owner;
 	unsigned int chip_count;
 	uint64_t chip_addrs[GIC600_MAX_MULTICHIP];
-	multichip_spi_ids_desc_t spi_ids[GIC600_MAX_MULTICHIP];
+	unsigned int spi_ids[GIC600_MAX_MULTICHIP][GIC600_SPI_IDS_SIZE];
 };
 
-uintptr_t gic600_multichip_gicd_base_for_spi(uint32_t spi_id);
 void gic600_multichip_init(struct gic600_multichip_data *multichip_data);
-bool gic600_multichip_is_initialized(void);
-
 #endif /* GIC600_MULTICHIP_H */

@@ -54,6 +54,7 @@ struct stm32_clk_ops {
 };
 
 struct clk_stm32 {
+	const char *name;
 	uint16_t binding;
 	uint16_t parent;
 	uint8_t flags;
@@ -162,6 +163,8 @@ int clk_oscillator_wait_ready(struct stm32_clk_priv *priv, int id, bool ready_on
 int clk_oscillator_wait_ready_on(struct stm32_clk_priv *priv, int id);
 int clk_oscillator_wait_ready_off(struct stm32_clk_priv *priv, int id);
 
+const char *_clk_stm32_get_name(struct stm32_clk_priv *priv, int id);
+const char *clk_stm32_get_name(struct stm32_clk_priv *priv, unsigned long binding_id);
 int clk_stm32_get_counter(unsigned long binding_id);
 
 void _clk_stm32_gate_disable(struct stm32_clk_priv *priv, uint16_t gate_id);
@@ -223,6 +226,7 @@ struct clk_stm32_div_cfg {
 
 #define STM32_DIV(idx, _binding, _parent, _flags, _div_id) \
 	[(idx)] = (struct clk_stm32){ \
+		.name		= #idx,\
 		.binding	= (_binding),\
 		.parent		=  (_parent),\
 		.flags		= (_flags),\
@@ -238,6 +242,7 @@ struct clk_stm32_gate_cfg {
 
 #define STM32_GATE(idx, _binding, _parent, _flags, _gate_id) \
 	[(idx)] = (struct clk_stm32){ \
+		.name		= #idx,\
 		.binding	= (_binding),\
 		.parent		=  (_parent),\
 		.flags		= (_flags),\
@@ -257,6 +262,7 @@ unsigned long fixed_factor_recalc_rate(struct stm32_clk_priv *priv,
 
 #define FIXED_FACTOR(idx, _idx, _parent, _mult, _div) \
 	[(idx)] = (struct clk_stm32){ \
+		.name		= #idx,\
 		.binding	= (_idx),\
 		.parent		= (_parent),\
 		.clock_cfg	= &(struct fixed_factor_cfg){\
@@ -268,6 +274,7 @@ unsigned long fixed_factor_recalc_rate(struct stm32_clk_priv *priv,
 
 #define GATE(idx, _binding, _parent, _flags, _offset, _bit_idx) \
 	[(idx)] = (struct clk_stm32){ \
+		.name		= #idx,\
 		.binding	= (_binding),\
 		.parent		=  (_parent),\
 		.flags		= (_flags),\
@@ -280,6 +287,7 @@ unsigned long fixed_factor_recalc_rate(struct stm32_clk_priv *priv,
 
 #define STM32_MUX(idx, _binding, _mux_id, _flags) \
 	[(idx)] = (struct clk_stm32){ \
+		.name		= #idx,\
 		.binding	= (_binding),\
 		.parent		= (MUX(_mux_id)),\
 		.flags		= (_flags),\
@@ -294,6 +302,7 @@ struct clk_timer_cfg {
 
 #define CK_TIMER(idx, _idx, _parent, _flags, _apbdiv, _timpre) \
 	[(idx)] = (struct clk_stm32){ \
+		.name		= #idx,\
 		.binding	= (_idx),\
 		.parent		= (_parent),\
 		.flags		= (CLK_SET_RATE_PARENT | (_flags)),\
@@ -310,6 +319,7 @@ struct clk_stm32_fixed_rate_cfg {
 
 #define CLK_FIXED_RATE(idx, _binding, _rate) \
 	[(idx)] = (struct clk_stm32){ \
+		.name		= #idx,\
 		.binding	= (_binding),\
 		.parent		= (CLK_IS_ROOT),\
 		.clock_cfg	= &(struct clk_stm32_fixed_rate_cfg){\
@@ -360,6 +370,7 @@ struct stm32_osc_cfg {
 
 #define CLK_OSC(idx, _idx, _parent, _osc_id) \
 	[(idx)] = (struct clk_stm32){ \
+		.name		= #idx,\
 		.binding	= (_idx),\
 		.parent		= (_parent),\
 		.flags		= CLK_IS_CRITICAL,\
@@ -371,6 +382,7 @@ struct stm32_osc_cfg {
 
 #define CLK_OSC_FIXED(idx, _idx, _parent, _osc_id) \
 	[(idx)] = (struct clk_stm32){ \
+		.name		= #idx,\
 		.binding	= (_idx),\
 		.parent		= (_parent),\
 		.flags		= CLK_IS_CRITICAL,\

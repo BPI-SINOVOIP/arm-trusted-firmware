@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2023, Intel Corporation. All rights reserved.
+ * Copyright (c) 2020-2022, Intel Corporation. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -7,12 +7,9 @@
 #include <lib/mmio.h>
 #include <common/debug.h>
 #include <drivers/delay_timer.h>
-#include <platform_def.h>
 
 #include "socfpga_mailbox.h"
-#include "socfpga_plat_def.h"
 #include "socfpga_sip_svc.h"
-#include "socfpga_system_manager.h"
 
 static mailbox_payload_t mailbox_resp_payload;
 static mailbox_container_t mailbox_resp_ctr = {0, 0, &mailbox_resp_payload};
@@ -185,7 +182,6 @@ int mailbox_read_response_async(unsigned int *job_id, uint32_t *header,
 	uint32_t resp_data;
 	uint32_t ret_resp_len = 0;
 	uint8_t is_done = 0;
-	uint32_t resp_len_check = 0;
 
 	if ((mailbox_resp_ctr.flag & MBOX_PAYLOAD_FLAG_BUSY) != 0) {
 		ret_resp_len = MBOX_RESP_LEN(
@@ -240,15 +236,9 @@ int mailbox_read_response_async(unsigned int *job_id, uint32_t *header,
 
 		/* copy response data to input buffer if applicable */
 		ret_resp_len = MBOX_RESP_LEN(mailbox_resp_ctr.payload->header);
-		if ((ret_resp_len > 0) && (response != NULL) && (resp_len != NULL)) {
+		if ((ret_resp_len > 0) && (response == NULL) && resp_len) {
 			if (*resp_len > ret_resp_len) {
 				*resp_len = ret_resp_len;
-			}
-
-			resp_len_check = (uint32_t) *resp_len;
-
-			if (resp_len_check > MBOX_DATA_MAX_LEN) {
-				return MBOX_RET_ERROR;
 			}
 
 			memcpy((uint8_t *) response,
@@ -474,26 +464,8 @@ void mailbox_set_qspi_open(void)
 
 void mailbox_set_qspi_direct(void)
 {
-	uint32_t response[1], qspi_clk, reg;
-	unsigned int resp_len = ARRAY_SIZE(response);
-
 	mailbox_send_cmd(MBOX_JOB_ID, MBOX_CMD_QSPI_DIRECT, NULL, 0U,
-			 CMD_CASUAL, response, &resp_len);
-
-	qspi_clk = response[0];
-	INFO("QSPI ref clock: %u\n", qspi_clk);
-
-	/*
-	 * Store QSPI ref clock frequency in BOOT_SCRATCH_COLD_0 register for
-	 * later boot loader (i.e. u-boot) use.
-	 * The frequency is stored in kHz and occupies BOOT_SCRATCH_COLD_0
-	 * register bits[27:0].
-	 */
-	qspi_clk /= 1000;
-	reg = mmio_read_32(SOCFPGA_SYSMGR(BOOT_SCRATCH_COLD_0));
-	reg &= ~SYSMGR_QSPI_REFCLK_MASK;
-	reg |= qspi_clk & SYSMGR_QSPI_REFCLK_MASK;
-	mmio_write_32(SOCFPGA_SYSMGR(BOOT_SCRATCH_COLD_0), reg);
+				CMD_CASUAL, NULL, NULL);
 }
 
 void mailbox_set_qspi_close(void)
@@ -523,18 +495,8 @@ void mailbox_hps_qspi_enable(void)
 void mailbox_reset_cold(void)
 {
 	mailbox_set_int(MBOX_INT_FLAG_COE | MBOX_INT_FLAG_RIE);
-
-	mailbox_send_cmd(MBOX_JOB_ID, MBOX_CMD_REBOOT_HPS, 0U, 0U,
-				 CMD_CASUAL, NULL, NULL);
-}
-
-void mailbox_reset_warm(uint32_t reset_type)
-{
-	mailbox_set_int(MBOX_INT_FLAG_COE | MBOX_INT_FLAG_RIE);
-
-	reset_type = 0x01; // Warm reset header data must be 1
-	mailbox_send_cmd(MBOX_JOB_ID, MBOX_CMD_REBOOT_HPS, &reset_type, 1U,
-				 CMD_CASUAL, NULL, NULL);
+	mailbox_send_cmd(MBOX_JOB_ID, MBOX_CMD_REBOOT_HPS, NULL, 0U,
+				CMD_CASUAL, NULL, NULL);
 }
 
 int mailbox_rsu_get_spt_offset(uint32_t *resp_buf, unsigned int resp_buf_len)
@@ -628,11 +590,6 @@ int intel_mailbox_get_config_status(uint32_t cmd, bool init_done)
 	}
 
 	res = response[RECONFIG_STATUS_STATE];
-
-	if (res == MBOX_CFGSTAT_VAB_BS_PREAUTH) {
-		return MBOX_CFGSTAT_STATE_CONFIG;
-	}
-
 	if ((res != 0U) && (res != MBOX_CFGSTAT_STATE_CONFIG)) {
 		return res;
 	}
@@ -644,7 +601,7 @@ int intel_mailbox_get_config_status(uint32_t cmd, bool init_done)
 
 	res = response[RECONFIG_STATUS_SOFTFUNC_STATUS];
 	if ((res & SOFTFUNC_STATUS_SEU_ERROR) != 0U) {
-		ERROR("SoftFunction Status SEU ERROR\n");
+		return MBOX_CFGSTAT_STATE_ERROR_HARDWARE;
 	}
 
 	if ((res & SOFTFUNC_STATUS_CONF_DONE) == 0U) {
@@ -687,18 +644,4 @@ int mailbox_hwmon_readvolt(uint32_t chan, uint32_t *resp_buf)
 	return mailbox_send_cmd(MBOX_JOB_ID, MBOX_HWMON_READVOLT, &chan, 1U,
 				CMD_CASUAL, resp_buf,
 				&resp_len);
-}
-
-int mailbox_seu_err_status(uint32_t *resp_buf, unsigned int resp_buf_len)
-{
-
-	return mailbox_send_cmd(MBOX_JOB_ID, MBOX_CMD_SEU_ERR_READ, NULL, 0U,
-				CMD_CASUAL, resp_buf,
-				&resp_buf_len);
-}
-
-int mailbox_safe_inject_seu_err(uint32_t *arg, unsigned int len)
-{
-	return mailbox_send_cmd(MBOX_JOB_ID, MBOX_CMD_SAFE_INJECT_SEU_ERR, arg, len,
-			CMD_CASUAL, NULL, NULL);
 }

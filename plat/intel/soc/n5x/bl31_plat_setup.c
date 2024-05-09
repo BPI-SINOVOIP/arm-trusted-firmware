@@ -116,6 +116,8 @@ void bl31_platform_setup(void)
 		(uint64_t)plat_secondary_cpus_bl31_entry);
 
 	mailbox_hps_stage_notify(HPS_EXECUTION_STATE_SSBL);
+
+	ncore_enable_ocram_firewall();
 }
 
 const mmap_region_t plat_dm_mmap[] = {
@@ -138,7 +140,7 @@ const mmap_region_t plat_dm_mmap[] = {
 
 /*******************************************************************************
  * Perform the very early platform specific architectural setup here. At the
- * moment this is only initializes the mmu in a quick and dirty way.
+ * moment this is only intializes the mmu in a quick and dirty way.
  ******************************************************************************/
 void bl31_plat_arch_setup(void)
 {

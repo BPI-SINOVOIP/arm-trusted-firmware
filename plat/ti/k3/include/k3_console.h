@@ -7,6 +7,6 @@
 #ifndef K3_CONSOLE_H
 #define K3_CONSOLE_H
 
-void k3_console_setup(void);
+void bl31_console_setup(void);
 
 #endif /* K3_CONSOLE_H */

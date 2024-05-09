@@ -85,7 +85,7 @@
 #define FMU_BLK_PPI31		U(43)
 #define FMU_BLK_PRESENT_MASK	U(0xFFFFFFFFFFF)
 
-/* Safety Mechanism limit */
+/* Safety Mechamism limit */
 #define FMU_SMID_GICD_MAX	U(33)
 #define FMU_SMID_PPI_MAX	U(12)
 #define FMU_SMID_ITS_MAX	U(14)

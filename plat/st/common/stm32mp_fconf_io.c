@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2023, STMicroelectronics - All Rights Reserved
+ * Copyright (c) 2021, STMicroelectronics - All Rights Reserved
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -27,12 +27,12 @@ static io_block_spec_t gpt_block_spec = {
 };
 #endif
 
-#if (STM32MP_SDMMC || STM32MP_EMMC || STM32MP_SPI_NOR) && PSA_FWU_SUPPORT
-static io_block_spec_t metadata_block_spec = {
+#if (STM32MP_SDMMC || STM32MP_EMMC) && PSA_FWU_SUPPORT
+io_block_spec_t metadata_block_spec = {
 	.offset = 0,    /* To be filled at runtime */
 	.length = 0,    /* To be filled at runtime */
 };
-#endif /* (STM32MP_SDMMC || STM32MP_EMMC || STM32MP_SPI_NOR) && PSA_FWU_SUPPORT */
+#endif /* (STM32MP_SDMMC || STM32MP_EMMC) && PSA_FWU_SUPPORT */
 
 /* By default, STM32 platforms load images from the FIP */
 struct plat_io_policy policies[MAX_NUMBER_IDS] = {
@@ -42,14 +42,6 @@ struct plat_io_policy policies[MAX_NUMBER_IDS] = {
 		.img_type_guid = STM32MP_FIP_GUID,
 		.check = open_storage
 	},
-#ifndef DECRYPTION_SUPPORT_none
-	[ENC_IMAGE_ID] = {
-		.dev_handle = &fip_dev_handle,
-		.image_spec = (uintptr_t)NULL,
-		.img_type_guid = NULL_GUID,
-		.check = open_fip
-	},
-#endif
 #if STM32MP_SDMMC || STM32MP_EMMC
 	[GPT_IMAGE_ID] = {
 		.dev_handle = &storage_dev_handle,
@@ -58,7 +50,7 @@ struct plat_io_policy policies[MAX_NUMBER_IDS] = {
 		.check = open_storage
 	},
 #endif
-#if (STM32MP_SDMMC || STM32MP_EMMC || STM32MP_SPI_NOR) && PSA_FWU_SUPPORT
+#if (STM32MP_SDMMC || STM32MP_EMMC) && PSA_FWU_SUPPORT
 	[FWU_METADATA_IMAGE_ID] = {
 		.dev_handle = &storage_dev_handle,
 		.image_spec = (uintptr_t)&metadata_block_spec,
@@ -71,19 +63,10 @@ struct plat_io_policy policies[MAX_NUMBER_IDS] = {
 		.img_type_guid = NULL_GUID,
 		.check = open_storage
 	},
-#endif /* (STM32MP_SDMMC || STM32MP_EMMC || STM32MP_SPI_NOR) && PSA_FWU_SUPPORT */
+#endif /* (STM32MP_SDMMC || STM32MP_EMMC) && PSA_FWU_SUPPORT */
 };
 
-#define DEFAULT_UUID_NUMBER	U(7)
-
-#if TRUSTED_BOARD_BOOT
-#define TBBR_UUID_NUMBER	U(6)
-#else
-#define TBBR_UUID_NUMBER	U(0)
-#endif
-
-#define FCONF_ST_IO_UUID_NUMBER	(DEFAULT_UUID_NUMBER + \
-				 TBBR_UUID_NUMBER)
+#define FCONF_ST_IO_UUID_NUMBER	U(8)
 
 static io_uuid_spec_t fconf_stm32mp_uuids[FCONF_ST_IO_UUID_NUMBER];
 static OBJECT_POOL_ARRAY(fconf_stm32mp_uuids_pool, fconf_stm32mp_uuids);
@@ -102,14 +85,7 @@ static const struct policies_load_info load_info[FCONF_ST_IO_UUID_NUMBER] = {
 	{BL33_IMAGE_ID, "bl33_uuid"},
 	{HW_CONFIG_ID, "hw_cfg_uuid"},
 	{TOS_FW_CONFIG_ID, "tos_fw_cfg_uuid"},
-#if TRUSTED_BOARD_BOOT
-	{STM32MP_CONFIG_CERT_ID, "stm32mp_cfg_cert_uuid"},
-	{TRUSTED_KEY_CERT_ID, "t_key_cert_uuid"},
-	{TRUSTED_OS_FW_KEY_CERT_ID, "tos_fw_key_cert_uuid"},
-	{NON_TRUSTED_FW_KEY_CERT_ID, "nt_fw_key_cert_uuid"},
-	{TRUSTED_OS_FW_CONTENT_CERT_ID, "tos_fw_content_cert_uuid"},
-	{NON_TRUSTED_FW_CONTENT_CERT_ID, "nt_fw_content_cert_uuid"},
-#endif /* TRUSTED_BOARD_BOOT */
+	{NT_FW_CONFIG_ID, "nt_fw_cfg_uuid"},
 };
 
 int fconf_populate_stm32mp_io_policies(uintptr_t config)
@@ -159,20 +135,8 @@ int fconf_populate_stm32mp_io_policies(uintptr_t config)
 
 		uuid_ptr->uuid = uuid_helper.uuid_struct;
 		policies[load_info[i].image_id].image_spec = (uintptr_t)uuid_ptr;
-		switch (load_info[i].image_id) {
-#if ENCRYPT_BL32 && !defined(DECRYPTION_SUPPORT_none)
-		case BL32_IMAGE_ID:
-		case BL32_EXTRA1_IMAGE_ID:
-		case BL32_EXTRA2_IMAGE_ID:
-			policies[load_info[i].image_id].dev_handle = &enc_dev_handle;
-			policies[load_info[i].image_id].check = open_enc_fip;
-			break;
-#endif
-		default:
-			policies[load_info[i].image_id].dev_handle = &fip_dev_handle;
-			policies[load_info[i].image_id].check = open_fip;
-			break;
-		}
+		policies[load_info[i].image_id].dev_handle = &fip_dev_handle;
+		policies[load_info[i].image_id].check = open_fip;
 	}
 
 	return 0;

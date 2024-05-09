@@ -5,3 +5,8 @@
  */
 
 #include "stm32mp133.dtsi"
+
+/ {
+	soc {
+	};
+};

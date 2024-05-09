@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2023, STMicroelectronics - All Rights Reserved
+ * Copyright (C) 2022, STMicroelectronics - All Rights Reserved
  *
  * SPDX-License-Identifier: GPL-2.0+ OR BSD-3-Clause
  */
@@ -456,7 +456,7 @@ static const uint16_t SAES_src[] = {
 	},\
 }
 
-static const struct parent_cfg parent_mp13[MUX_MAX] = {
+static const struct parent_cfg parent_mp13[] = {
 	MUX_CFG(MUX_ADC1,	ADC1_src,	RCC_ADC12CKSELR, 0, 2),
 	MUX_CFG(MUX_ADC2,	ADC2_src,	RCC_ADC12CKSELR, 2, 2),
 	MUX_RDY_CFG(MUX_AXI,	AXI_src,	RCC_ASSCKSELR, 0, 3),
@@ -841,7 +841,7 @@ static const struct clk_div_table apb_div_table[] = {
 		.bitrdy	= _bitrdy,\
 }
 
-static const struct div_cfg dividers_mp13[DIV_MAX] = {
+static const struct div_cfg dividers_mp13[] = {
 	DIV_CFG(DIV_PLL1DIVP, RCC_PLL1CFGR2, 0, 7, 0, NULL, DIV_NO_BIT_RDY),
 	DIV_CFG(DIV_PLL2DIVP, RCC_PLL2CFGR2, 0, 7, 0, NULL, DIV_NO_BIT_RDY),
 	DIV_CFG(DIV_PLL2DIVQ, RCC_PLL2CFGR2, 8, 7, 0, NULL, DIV_NO_BIT_RDY),
@@ -1119,7 +1119,7 @@ static int stm32_clk_configure_clk(struct stm32_clk_priv *priv, uint32_t data)
 		return ret;
 	}
 
-	if (enable != 0) {
+	if (enable) {
 		clk_stm32_enable_call_ops(priv, clk_id);
 	} else {
 		clk_stm32_disable_call_ops(priv, clk_id);
@@ -1216,7 +1216,7 @@ static int stm32_clk_source_configure(struct stm32_clk_priv *priv)
 	 * => deactivate CKPER only after switching clock
 	 */
 	if (ckper_disabled) {
-		ret = stm32_clk_configure_mux(priv, CLK_CKPER_DISABLED);
+		ret = stm32_clk_configure_mux(priv, CLK_CKPER_DISABLED & CMD_MASK);
 		if (ret != 0) {
 			return ret;
 		}
@@ -1450,7 +1450,7 @@ static int _clk_stm32_pll_init(struct stm32_clk_priv *priv, int pll_idx,
 
 	/* Configure PLLs source */
 	ret = stm32_clk_configure_mux(priv, pll_conf->vco.src);
-	if (ret != 0) {
+	if (ret) {
 		return ret;
 	}
 
@@ -1485,7 +1485,7 @@ static int clk_stm32_pll_init(struct stm32_clk_priv *priv, int pll_idx)
 {
 	struct stm32_pll_dt_cfg *pll_conf = clk_stm32_pll_get_pdata(pll_idx);
 
-	if (pll_conf->vco.status != 0U) {
+	if (pll_conf->vco.status) {
 		return _clk_stm32_pll_init(priv, pll_idx, pll_conf);
 	}
 
@@ -1497,22 +1497,22 @@ static int stm32_clk_pll_configure(struct stm32_clk_priv *priv)
 	int err = 0;
 
 	err = clk_stm32_pll_init(priv, _PLL1);
-	if (err != 0) {
+	if (err) {
 		return err;
 	}
 
 	err = clk_stm32_pll_init(priv, _PLL2);
-	if (err != 0) {
+	if (err) {
 		return err;
 	}
 
 	err = clk_stm32_pll_init(priv, _PLL3);
-	if (err != 0) {
+	if (err) {
 		return err;
 	}
 
 	err = clk_stm32_pll_init(priv, _PLL4);
-	if (err != 0) {
+	if (err) {
 		return err;
 	}
 
@@ -1705,6 +1705,7 @@ static const struct stm32_clk_ops clk_stm32_pll_ops = {
 };
 
 #define CLK_PLL(idx, _idx, _parent, _gate, _pll_id, _flags)[idx] = {\
+	.name = #idx,\
 	.binding = _idx,\
 	.parent = _parent,\
 	.flags = (_flags),\
@@ -1761,6 +1762,7 @@ static const struct stm32_clk_ops clk_stm32_composite_ops = {
 
 #define STM32_COMPOSITE(idx, _binding, _parent, _flags, _gate_id,\
 			_div_id)[idx] = {\
+	.name = #idx,\
 	.binding = (_binding),\
 	.parent =  (_parent),\
 	.flags = (_flags),\
@@ -2242,7 +2244,7 @@ static int stm32_clk_parse_fdt_all_pll(void *fdt, int node, struct stm32_clk_pla
 	size_t i = 0U;
 
 	for (i = _PLL1; i < pdata->npll; i++) {
-		struct stm32_pll_dt_cfg *pll = &pdata->pll[i];
+		struct stm32_pll_dt_cfg *pll = pdata->pll + i;
 		char name[RCC_PLL_NAME_SIZE];
 		int subnode = 0;
 		int err = 0;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2023, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015-2022, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -19,6 +19,7 @@
 #include <drivers/st/stm32mp1_clk.h>
 
 #include <boot_api.h>
+#include <stm32mp_auth.h>
 #include <stm32mp_common.h>
 #include <stm32mp_dt.h>
 #include <stm32mp1_dbgmcu.h>
@@ -26,7 +27,11 @@
 #include <stm32mp1_shared_resources.h>
 #endif
 
+#if !STM32MP_USE_STM32IMAGE
 #include "stm32mp1_fip_def.h"
+#else /* STM32MP_USE_STM32IMAGE */
+#include "stm32mp1_stm32image_def.h"
+#endif /* STM32MP_USE_STM32IMAGE */
 
 /*******************************************************************************
  * CHIP ID
@@ -66,7 +71,6 @@
 
 #define STM32MP1_REV_B		U(0x2000)
 #if STM32MP13
-#define STM32MP1_REV_Y		U(0x1003)
 #define STM32MP1_REV_Z		U(0x1001)
 #endif
 #if STM32MP15
@@ -188,13 +192,6 @@ enum ddr_type {
 
 /* Define maximum page size for NAND devices */
 #define PLATFORM_MTD_MAX_PAGE_SIZE	U(0x1000)
-
-/* Define location for the MTD scratch buffer */
-#if STM32MP13
-#define STM32MP_MTD_BUFFER		(SRAM1_BASE + \
-					 SRAM1_SIZE - \
-					 PLATFORM_MTD_MAX_PAGE_SIZE)
-#endif
 
 /*******************************************************************************
  * STM32MP1 device/io map related constants (used for MMU)
@@ -417,6 +414,12 @@ enum ddr_type {
 #define STM32MP_SDMMC2_BASE		U(0x58007000)
 #define STM32MP_SDMMC3_BASE		U(0x48004000)
 
+#define STM32MP_MMC_INIT_FREQ			U(400000)	/*400 KHz*/
+#define STM32MP_SD_NORMAL_SPEED_MAX_FREQ	U(25000000)	/*25 MHz*/
+#define STM32MP_SD_HIGH_SPEED_MAX_FREQ		U(50000000)	/*50 MHz*/
+#define STM32MP_EMMC_NORMAL_SPEED_MAX_FREQ	U(26000000)	/*26 MHz*/
+#define STM32MP_EMMC_HIGH_SPEED_MAX_FREQ	U(52000000)	/*52 MHz*/
+
 /*******************************************************************************
  * STM32MP1 BSEC / OTP
  ******************************************************************************/
@@ -427,22 +430,14 @@ enum ddr_type {
 
 /* OTP labels */
 #define CFG0_OTP			"cfg0_otp"
-#define PART_NUMBER_OTP			"part-number-otp"
+#define PART_NUMBER_OTP			"part_number_otp"
 #if STM32MP15
 #define PACKAGE_OTP			"package_otp"
 #endif
 #define HW2_OTP				"hw2_otp"
-#if STM32MP13
-#define NAND_OTP			"cfg9_otp"
-#define NAND2_OTP			"cfg10_otp"
-#endif
-#if STM32MP15
 #define NAND_OTP			"nand_otp"
-#endif
 #define MONOTONIC_OTP			"monotonic_otp"
 #define UID_OTP				"uid_otp"
-#define PKH_OTP				"pkh_otp"
-#define ENCKEY_OTP			"enckey_otp"
 #define BOARD_ID_OTP			"board_id"
 
 /* OTP mask */
@@ -500,7 +495,7 @@ enum ddr_type {
 #define NAND_BLOCK_SIZE_128_PAGES	U(1)
 #define NAND_BLOCK_SIZE_256_PAGES	U(2)
 
-/* NAND number of block (in unit of 256 blocks) */
+/* NAND number of block (in unit of 256 blocs) */
 #define NAND_BLOCK_NB_MASK		GENMASK_32(26, 19)
 #define NAND_BLOCK_NB_SHIFT		19
 #define NAND_BLOCK_NB_UNIT		U(256)
@@ -521,27 +516,20 @@ enum ddr_type {
 /* NAND number of planes */
 #define NAND_PLANE_BIT_NB_MASK		BIT(14)
 
-/* NAND2 OTP */
-#define NAND2_PAGE_SIZE_SHIFT		16
-
-/* NAND2 config distribution */
-#define NAND2_CONFIG_DISTRIB		BIT(0)
-#define NAND2_PNAND_NAND2_SNAND_NAND1	U(0)
-#define NAND2_PNAND_NAND1_SNAND_NAND2	U(1)
-
 /* MONOTONIC OTP */
 #define MAX_MONOTONIC_VALUE		32
 
 /* UID OTP */
 #define UID_WORD_NB			U(3)
 
+/* FWU configuration (max supported value is 15) */
+#define FWU_MAX_TRIAL_REBOOT		U(3)
+
 /*******************************************************************************
  * STM32MP1 TAMP
  ******************************************************************************/
 #define TAMP_BASE			U(0x5C00A000)
 #define TAMP_BKP_REGISTER_BASE		(TAMP_BASE + U(0x100))
-#define TAMP_BKP_REG_CLK		RTCAPB
-#define TAMP_COUNTR			U(0x40)
 
 #if !(defined(__LINKER__) || defined(__ASSEMBLER__))
 static inline uintptr_t tamp_bkpr(uint32_t idx)
@@ -634,17 +622,16 @@ static inline uintptr_t tamp_bkpr(uint32_t idx)
 /* 3 PWR + 1 VREFBUF + 14 PMIC regulators + 1 FIXED */
 #define PLAT_NB_RDEVS			U(19)
 /* 2 FIXED */
-#define PLAT_NB_FIXED_REGUS		U(2)
+#define PLAT_NB_FIXED_REGS		U(2)
 
 /*******************************************************************************
  * Device Tree defines
  ******************************************************************************/
+#define DT_BSEC_COMPAT			"st,stm32mp15-bsec"
 #if STM32MP13
-#define DT_BSEC_COMPAT			"st,stm32mp13-bsec"
 #define DT_DDR_COMPAT			"st,stm32mp13-ddr"
 #endif
 #if STM32MP15
-#define DT_BSEC_COMPAT			"st,stm32mp15-bsec"
 #define DT_DDR_COMPAT			"st,stm32mp1-ddr"
 #endif
 #define DT_IWDG_COMPAT			"st,stm32mp1-iwdg"
@@ -658,6 +645,5 @@ static inline uintptr_t tamp_bkpr(uint32_t idx)
 #define DT_RCC_SEC_CLK_COMPAT		"st,stm32mp1-rcc-secure"
 #endif
 #define DT_SDMMC2_COMPAT		"st,stm32-sdmmc2"
-#define DT_UART_COMPAT			"st,stm32h7-uart"
 
 #endif /* STM32MP1_DEF_H */

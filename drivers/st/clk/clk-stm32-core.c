@@ -215,6 +215,24 @@ int _clk_stm32_gate_enable(struct stm32_clk_priv *priv, uint16_t gate_id)
 	return 0;
 }
 
+const char *_clk_stm32_get_name(struct stm32_clk_priv *priv, int id)
+{
+	return priv->clks[id].name;
+}
+
+const char *clk_stm32_get_name(struct stm32_clk_priv *priv,
+			       unsigned long binding_id)
+{
+	int id;
+
+	id = clk_get_index(priv, binding_id);
+	if (id == -EINVAL) {
+		return NULL;
+	}
+
+	return _clk_stm32_get_name(priv, id);
+}
+
 const struct clk_stm32 *_clk_get(struct stm32_clk_priv *priv, int id)
 {
 	if ((unsigned int)id < priv->num) {
@@ -466,9 +484,10 @@ unsigned long _clk_stm32_get_rate(struct stm32_clk_priv *priv, int id)
 {
 	const struct clk_stm32 *clk = _clk_get(priv, id);
 	int parent;
+	unsigned long rate = 0UL;
 
 	if ((unsigned int)id >= priv->num) {
-		return 0UL;
+		return rate;
 	}
 
 	parent = _clk_stm32_get_parent(priv, id);
@@ -483,14 +502,21 @@ unsigned long _clk_stm32_get_rate(struct stm32_clk_priv *priv, int id)
 			prate = _clk_stm32_get_rate(priv, parent);
 		}
 
-		return clk->ops->recalc_rate(priv, id, prate);
+		rate = clk->ops->recalc_rate(priv, id, prate);
+
+		return rate;
 	}
 
-	if (parent == CLK_IS_ROOT) {
+	switch (parent) {
+	case CLK_IS_ROOT:
 		panic();
-	}
 
-	return _clk_stm32_get_rate(priv, parent);
+	default:
+		rate = _clk_stm32_get_rate(priv, parent);
+		break;
+	}
+	return rate;
+
 }
 
 unsigned long _clk_stm32_get_parent_rate(struct stm32_clk_priv *priv, int id)
@@ -511,7 +537,7 @@ static uint8_t _stm32_clk_get_flags(struct stm32_clk_priv *priv, int id)
 
 bool _stm32_clk_is_flags(struct stm32_clk_priv *priv, int id, uint8_t flag)
 {
-	if ((_stm32_clk_get_flags(priv, id) & flag) != 0U) {
+	if (_stm32_clk_get_flags(priv, id) & flag) {
 		return true;
 	}
 
@@ -541,7 +567,7 @@ static int _clk_stm32_enable_core(struct stm32_clk_priv *priv, int id)
 		}
 		if (parent != CLK_IS_ROOT) {
 			ret = _clk_stm32_enable_core(priv, parent);
-			if (ret != 0) {
+			if (ret) {
 				return ret;
 			}
 		}

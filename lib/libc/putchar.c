@@ -1,13 +1,20 @@
 /*
- * Copyright (c) 2013-2023, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2013-2018, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
 #include <stdio.h>
 
-#pragma weak putchar
+#include <drivers/console.h>
+
 int putchar(int c)
 {
-	return c;
+	int res;
+	if (console_putc((unsigned char)c) >= 0)
+		res = c;
+	else
+		res = EOF;
+
+	return res;
 }

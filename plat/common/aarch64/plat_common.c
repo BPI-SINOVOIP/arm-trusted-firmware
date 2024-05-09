@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2023, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2014-2022, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -9,9 +9,8 @@
 #include <stdint.h>
 
 #include <arch_helpers.h>
-#include <common/debug.h>
 #include <drivers/console.h>
-#if ENABLE_FEAT_RAS
+#if RAS_EXTENSION
 #include <lib/extensions/ras.h>
 #endif
 #include <lib/xlat_tables/xlat_mmu_helpers.h>
@@ -29,9 +28,7 @@
 #pragma weak plat_sdei_validate_entry_point
 #endif
 
-#if FFH_SUPPORT
 #pragma weak plat_ea_handler = plat_default_ea_handler
-#endif
 
 void bl31_plat_runtime_setup(void)
 {
@@ -69,22 +66,23 @@ int plat_sdei_validate_entry_point(uintptr_t ep, unsigned int client_mode)
 }
 #endif
 
-const char *get_el_str(unsigned int el)
+#if !ENABLE_BACKTRACE
+static const char *get_el_str(unsigned int el)
 {
 	if (el == MODE_EL3) {
 		return "EL3";
 	} else if (el == MODE_EL2) {
 		return "EL2";
 	}
-	return "EL1";
+	return "S-EL1";
 }
+#endif /* !ENABLE_BACKTRACE */
 
-#if FFH_SUPPORT
-/* Handler for External Aborts from lower EL including RAS errors */
+/* RAS functions common to AArch64 ARM platforms */
 void plat_default_ea_handler(unsigned int ea_reason, uint64_t syndrome, void *cookie,
 		void *handle, uint64_t flags)
 {
-#if ENABLE_FEAT_RAS
+#if RAS_EXTENSION
 	/* Call RAS EA handler */
 	int handled = ras_ea_handler(ea_reason, syndrome, cookie, handle, flags);
 	if (handled != 0)
@@ -96,10 +94,12 @@ void plat_default_ea_handler(unsigned int ea_reason, uint64_t syndrome, void *co
 	ERROR("Unhandled External Abort received on 0x%lx from %s\n",
 		read_mpidr_el1(), get_el_str(level));
 	ERROR("exception reason=%u syndrome=0x%" PRIx64 "\n", ea_reason, syndrome);
-
-	/* We reached here due to a panic from a lower EL and assuming this is the default
-	 * platform registered handler that we could call on a lower EL panic.
-	 */
-	lower_el_panic();
-}
+#if HANDLE_EA_EL3_FIRST
+	/* Skip backtrace for lower EL */
+	if (level != MODE_EL3) {
+		console_flush();
+		do_panic();
+	}
 #endif
+	panic();
+}

@@ -14,6 +14,7 @@
 #endif
 
 	.global arm_rotpk_header
+	.global arm_rotpk_header_end
 	.section .rodata.arm_rotpk_hash, "a"
 
 arm_rotpk_header:

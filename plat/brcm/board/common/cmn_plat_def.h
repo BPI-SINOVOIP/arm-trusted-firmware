@@ -8,7 +8,6 @@
 #define CMN_PLAT_DEF_H
 
 #include <bcm_elog.h>
-#include <platform_def.h>
 
 #ifndef GET_LOG_LEVEL
 #define GET_LOG_LEVEL() LOG_LEVEL
@@ -57,6 +56,9 @@
 				tf_log(LOG_MARKER_VERBOSE __VA_ARGS__);	 \
 			}						 \
 		} while (0)
+
+/* Print file and line number on assert */
+#define PLAT_LOG_LEVEL_ASSERT LOG_LEVEL_INFO
 
 /*
  * The number of regions like RO(code), coherent and data required by

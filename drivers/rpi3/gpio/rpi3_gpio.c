@@ -10,7 +10,6 @@
 #include <lib/mmio.h>
 #include <drivers/delay_timer.h>
 #include <drivers/rpi3/gpio/rpi3_gpio.h>
-#include <platform_def.h>
 
 static uintptr_t reg_base;
 

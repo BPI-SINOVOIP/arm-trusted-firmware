@@ -14,10 +14,12 @@
 
 u_register_t plat_get_stack_protector_canary(void)
 {
+#if ENABLE_FEAT_RNG
 	/* Use the RNDR instruction if the CPU supports it */
-	if (is_feat_rng_supported()) {
+	if (is_armv8_5_rng_present()) {
 		return read_rndr();
 	}
+#endif
 
 	/*
 	 * Ideally, a random number should be returned above. If a random

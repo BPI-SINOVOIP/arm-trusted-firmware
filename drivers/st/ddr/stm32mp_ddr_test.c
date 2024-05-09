@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2023, STMicroelectronics - All Rights Reserved
+ * Copyright (C) 2022, STMicroelectronics - All Rights Reserved
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -18,19 +18,19 @@
  * Note that the previous content is restored after test.
  * Returns 0 if success, and address value else.
  ******************************************************************************/
-uintptr_t stm32mp_ddr_test_rw_access(void)
+uint32_t stm32mp_ddr_test_rw_access(void)
 {
 	uint32_t saved_value = mmio_read_32(STM32MP_DDR_BASE);
 
 	mmio_write_32(STM32MP_DDR_BASE, DDR_PATTERN);
 
 	if (mmio_read_32(STM32MP_DDR_BASE) != DDR_PATTERN) {
-		return STM32MP_DDR_BASE;
+		return (uint32_t)STM32MP_DDR_BASE;
 	}
 
 	mmio_write_32(STM32MP_DDR_BASE, saved_value);
 
-	return 0UL;
+	return 0U;
 }
 
 /*******************************************************************************
@@ -41,7 +41,7 @@ uintptr_t stm32mp_ddr_test_rw_access(void)
  * File: memtest.c - This source code belongs to Public Domain.
  * Returns 0 if success, and address value else.
  ******************************************************************************/
-uintptr_t stm32mp_ddr_test_data_bus(void)
+uint32_t stm32mp_ddr_test_data_bus(void)
 {
 	uint32_t pattern;
 
@@ -49,11 +49,11 @@ uintptr_t stm32mp_ddr_test_data_bus(void)
 		mmio_write_32(STM32MP_DDR_BASE, pattern);
 
 		if (mmio_read_32(STM32MP_DDR_BASE) != pattern) {
-			return STM32MP_DDR_BASE;
+			return (uint32_t)STM32MP_DDR_BASE;
 		}
 	}
 
-	return 0UL;
+	return 0;
 }
 
 /*******************************************************************************
@@ -65,34 +65,38 @@ uintptr_t stm32mp_ddr_test_data_bus(void)
  * size: size in bytes of the DDR memory device.
  * Returns 0 if success, and address value else.
  ******************************************************************************/
-uintptr_t stm32mp_ddr_test_addr_bus(size_t size)
+uint32_t stm32mp_ddr_test_addr_bus(uint64_t size)
 {
-	size_t addressmask = size - 1U;
-	size_t offset;
-	size_t testoffset = 0U;
+	uint64_t addressmask = size - 1U;
+	uint64_t offset;
+	uint64_t testoffset = 0U;
 
 	/* Write the default pattern at each of the power-of-two offsets. */
 	for (offset = sizeof(uint32_t); (offset & addressmask) != 0U;
 	     offset <<= 1U) {
-		mmio_write_32(STM32MP_DDR_BASE + offset, DDR_PATTERN);
+		mmio_write_32(STM32MP_DDR_BASE + (uint32_t)offset,
+			      DDR_PATTERN);
 	}
 
 	/* Check for address bits stuck high. */
-	mmio_write_32(STM32MP_DDR_BASE + testoffset, DDR_ANTIPATTERN);
+	mmio_write_32(STM32MP_DDR_BASE + (uint32_t)testoffset,
+		      DDR_ANTIPATTERN);
 
 	for (offset = sizeof(uint32_t); (offset & addressmask) != 0U;
 	     offset <<= 1U) {
-		if (mmio_read_32(STM32MP_DDR_BASE + offset) != DDR_PATTERN) {
-			return STM32MP_DDR_BASE + offset;
+		if (mmio_read_32(STM32MP_DDR_BASE + (uint32_t)offset) !=
+		    DDR_PATTERN) {
+			return (uint32_t)(STM32MP_DDR_BASE + offset);
 		}
 	}
 
-	mmio_write_32(STM32MP_DDR_BASE + testoffset, DDR_PATTERN);
+	mmio_write_32(STM32MP_DDR_BASE + (uint32_t)testoffset, DDR_PATTERN);
 
 	/* Check for address bits stuck low or shorted. */
 	for (testoffset = sizeof(uint32_t); (testoffset & addressmask) != 0U;
 	     testoffset <<= 1U) {
-		mmio_write_32(STM32MP_DDR_BASE + testoffset, DDR_ANTIPATTERN);
+		mmio_write_32(STM32MP_DDR_BASE + (uint32_t)testoffset,
+			      DDR_ANTIPATTERN);
 
 		if (mmio_read_32(STM32MP_DDR_BASE) != DDR_PATTERN) {
 			return STM32MP_DDR_BASE;
@@ -100,16 +104,18 @@ uintptr_t stm32mp_ddr_test_addr_bus(size_t size)
 
 		for (offset = sizeof(uint32_t); (offset & addressmask) != 0U;
 		     offset <<= 1) {
-			if ((mmio_read_32(STM32MP_DDR_BASE + offset) != DDR_PATTERN) &&
+			if ((mmio_read_32(STM32MP_DDR_BASE +
+					  (uint32_t)offset) != DDR_PATTERN) &&
 			    (offset != testoffset)) {
-				return STM32MP_DDR_BASE + offset;
+				return (uint32_t)(STM32MP_DDR_BASE + offset);
 			}
 		}
 
-		mmio_write_32(STM32MP_DDR_BASE + testoffset, DDR_PATTERN);
+		mmio_write_32(STM32MP_DDR_BASE + (uint32_t)testoffset,
+			      DDR_PATTERN);
 	}
 
-	return 0UL;
+	return 0U;
 }
 
 /*******************************************************************************
@@ -119,9 +125,9 @@ uintptr_t stm32mp_ddr_test_addr_bus(size_t size)
  * restore its content.
  * Returns DDR computed size.
  ******************************************************************************/
-size_t stm32mp_ddr_check_size(void)
+uint32_t stm32mp_ddr_check_size(void)
 {
-	size_t offset = sizeof(uint32_t);
+	uint32_t offset = sizeof(uint32_t);
 
 	mmio_write_32(STM32MP_DDR_BASE, DDR_PATTERN);
 
@@ -135,6 +141,8 @@ size_t stm32mp_ddr_check_size(void)
 
 		offset <<= 1U;
 	}
+
+	INFO("Memory size = 0x%x (%u MB)\n", offset, offset / (1024U * 1024U));
 
 	return offset;
 }

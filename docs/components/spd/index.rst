@@ -8,4 +8,3 @@ Secure Payload Dispatcher (SPD)
    optee-dispatcher
    tlk-dispatcher
    trusty-dispatcher
-   pnc-dispatcher

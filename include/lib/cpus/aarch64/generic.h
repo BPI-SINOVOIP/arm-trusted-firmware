@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, Arm Limited. All rights reserved.
+ * Copyright (c) 2020, Arm Limited. All rights reserverd.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2023, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2016-2022, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -29,7 +29,7 @@ CASSERT((PLAT_PARTITION_BLOCK_SIZE == 512) ||
 
 #define LEGACY_PARTITION_BLOCK_SIZE	512
 
-#define LBA(n) ((unsigned long long)(n) * PLAT_PARTITION_BLOCK_SIZE)
+#define DEFAULT_GPT_HEADER_SIZE 	92
 
 typedef struct partition_entry {
 	uint64_t		start;
@@ -50,6 +50,5 @@ const partition_entry_t *get_partition_entry_by_type(const uuid_t *type_guid);
 const partition_entry_t *get_partition_entry_by_uuid(const uuid_t *part_uuid);
 const partition_entry_list_t *get_partition_entry_list(void);
 void partition_init(unsigned int image_id);
-int gpt_partition_init(void);
 
 #endif /* PARTITION_H */

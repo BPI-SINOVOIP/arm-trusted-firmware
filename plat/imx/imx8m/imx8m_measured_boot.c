@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, Arm Limited. All rights reserved.
+ * Copyright (c) 2022, Arm Limited. All rights reserved.
  * Copyright (c) 2022, Linaro.
  *
  * SPDX-License-Identifier: BSD-3-Clause
@@ -24,13 +24,17 @@ static const event_log_metadata_t imx8m_event_log_metadata[] = {
 	{ EVLOG_INVALID_ID, NULL, (unsigned int)(-1) }	/* Terminator */
 };
 
+const event_log_metadata_t *plat_event_log_get_metadata(void)
+{
+	return imx8m_event_log_metadata;
+}
+
 int plat_mboot_measure_image(unsigned int image_id, image_info_t *image_data)
 {
 	/* Calculate image hash and record data in Event Log */
 	int err = event_log_measure_and_record(image_data->image_base,
 					       image_data->image_size,
-					       image_id,
-					       imx8m_event_log_metadata);
+					       image_id);
 	if (err != 0) {
 		ERROR("%s%s image id %u (%i)\n",
 		      "Failed to ", "record", image_id, err);
@@ -78,10 +82,4 @@ void bl2_plat_mboot_finish(void)
 	flush_dcache_range(ns_log_addr, event_log_cur_size);
 
 	dump_event_log((uint8_t *)event_log, event_log_cur_size);
-}
-
-int plat_mboot_measure_key(const void *pk_oid, const void *pk_ptr,
-			   size_t pk_len)
-{
-	return 0;
 }

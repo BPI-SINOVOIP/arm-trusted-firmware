@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2022, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015-2021, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -15,8 +15,6 @@
 
 	.globl	platform_mem_init
 	.globl	plat_report_exception
-	.globl	plat_report_prefetch_abort
-	.globl	plat_report_data_abort
 	.globl	plat_get_my_entrypoint
 	.globl	plat_secondary_cold_boot_setup
 	.globl	plat_reset_handler
@@ -32,18 +30,20 @@ func platform_mem_init
 	bx	lr
 endfunc platform_mem_init
 
-#if DEBUG
 func plat_report_exception
+#if DEBUG
 	mov	r8, lr
 
-	/*
-	 * Test if an abort occurred
-	 * In this case the error message has already been displayed
-	 * by dedicated functions
-	 */
+	/* Test if an abort occurred */
 	cmp	r0, #MODE32_abt
-	beq	1f
+	bne	undef_inst_lbl
+	ldr	r4, =abort_str
+	bl	asm_print_str
+	mrs	r4, lr_abt
+	sub	r4, r4, #4
+	b	print_exception_info
 
+undef_inst_lbl:
 	/* Test for an undefined instruction */
 	cmp	r0, #MODE32_und
 	bne	other_exception_lbl
@@ -69,68 +69,11 @@ print_exception_info:
 	ldr	r4, =end_error_str
 	bl	asm_print_str
 
-1:
 	bx	r8
+#else
+	bx	lr
+#endif
 endfunc plat_report_exception
-
-func plat_report_prefetch_abort
-	mov	r8, lr
-	mov	r9, r0
-
-	ldr	r4, =prefetch_abort_str
-	bl	asm_print_str
-
-	mov	r4, r9
-	sub	r4, r4, #4
-	bl	asm_print_hex
-
-	ldr	r4, =ifsr_str
-	bl	asm_print_str
-
-	ldcopr	r4, IFSR
-	bl	asm_print_hex
-
-	ldr	r4, =ifar_str
-	bl	asm_print_str
-
-	ldcopr	r4, IFAR
-	bl	asm_print_hex
-
-	ldr	r4, =end_error_str
-	bl	asm_print_str
-
-	bx	r8
-endfunc plat_report_prefetch_abort
-
-func plat_report_data_abort
-	mov	r8, lr
-	mov	r9, r0
-
-	ldr	r4, =data_abort_str
-	bl	asm_print_str
-
-	mov	r4, r9
-	sub	r4, r4, #8
-	bl	asm_print_hex
-
-	ldr	r4, =dfsr_str
-	bl	asm_print_str
-
-	ldcopr	r4, DFSR
-	bl	asm_print_hex
-
-	ldr	r4, =dfar_str
-	bl	asm_print_str
-
-	ldcopr	r4, DFAR
-	bl	asm_print_hex
-
-	ldr	r4, =end_error_str
-	bl	asm_print_str
-
-	bx	r8
-endfunc plat_report_data_abort
-#endif /* DEBUG */
 
 func plat_reset_handler
 	bx	lr
@@ -313,24 +256,14 @@ endfunc plat_panic_handler
 
 #if DEBUG
 .section .rodata.rev_err_str, "aS"
-prefetch_abort_str:
-	.asciz "\nPrefetch Abort at: 0x"
-data_abort_str:
-	.asciz "\nData Abort at: 0x"
+abort_str:
+	.asciz "\nAbort at: 0x"
 undefined_str:
 	.asciz "\nUndefined instruction at: 0x"
 exception_start_str:
 	.asciz "\nException mode=0x"
 exception_end_str:
 	.asciz " at: 0x"
-dfsr_str:
-	.asciz " DFSR = 0x"
-dfar_str:
-	.asciz " DFAR = 0x"
-ifsr_str:
-	.asciz " IFSR = 0x"
-ifar_str:
-	.asciz " IFAR = 0x"
 end_error_str:
 	.asciz "\n\r"
 #endif

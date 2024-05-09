@@ -632,6 +632,8 @@ void sc_rm_dump(sc_ipc_t ipc)
 	RPC_SIZE(&msg) = 1U;
 
 	sc_call_rpc(ipc, &msg, SC_FALSE);
+
+	return;
 }
 
 /**@}*/

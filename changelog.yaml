@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2021-2023, Arm Limited. All rights reserved.
+# Copyright (c) 2021-2022, Arm Limited. All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
 #
@@ -31,7 +31,7 @@ sections:
     type: ci
     hidden: true
 
-  - title: Documentation
+  - title: Build System
     description: Documentation-only changes
     type: docs
     hidden: true
@@ -89,26 +89,8 @@ subsections:
       - title: Activity Monitors Extension (FEAT_AMU)
         scope: amu
 
-      - title: Branch Record Buffer Extension (FEAT_BRBE)
-        scope: brbe
-
-      - title: Branch Target Identification Extension
-        scope: bti
-
       - title: Confidential Compute Architecture (CCA)
         scope: cca
-
-      - title: Extended Cache Index (FEAT_CCIDX)
-        scope: ccidx
-
-      - title: Extended Translation Control Register (FEAT_TCR2).
-        scope: tcr2
-
-      - title: CPU feature / ID register handling in general
-        scope: cpufeat
-
-      - title: Guarded Control Stack (FEAT_GCS)
-        scope: gcs
 
       - title: Support for the `HCRX_EL2` register (FEAT_HCX)
         scope: hcx
@@ -116,23 +98,8 @@ subsections:
       - title: Memory Partitioning and Monitoring (MPAM) Extension (FEAT_MPAM)
         scope: mpam
 
-      - title: Memory Tagging Extension
-        scope: mte
-
-      - title: Pointer Authentication Extension
-        scope: pauth
-
-      - title: Performance Monitors Extension (FEAT_PMUv3)
-        scope: pmu
-
-      - title: Trapping support for RNDR/RNDRRS (FEAT_RNG_TRAP)
-        scope: rng-trap
-
-      - title: Scalable Matrix Extension (FEAT_SME, FEAT_SME2)
+      - title: Scalable Matrix Extension (FEAT_SME)
         scope: sme
-
-      - title: Statistical profiling Extension (FEAT_SPE)
-        scope: spe
 
       - title: Scalable Vector Extension (FEAT_SVE)
         scope: sve
@@ -149,11 +116,16 @@ subsections:
       - title: Self-hosted Trace Extensions (FEAT_TRF)
         scope: trf
 
-  - title: Platforms
-    scope: platforms
+      - title: Statistical profiling Extension (FEAT_SPE)
+        scope: spe
 
-    deprecated:
-      - plat/common
+      - title: Branch Record Buffer Extension (FEAT_BRBE)
+        scope: brbe
+
+      - title: Extended Cache Index (FEAT_CCIDX)
+        scope: ccidx
+
+  - title: Platforms
 
     subsections:
       - title: Allwinner
@@ -169,39 +141,25 @@ subsections:
           - plat/arm
 
         subsections:
-          - title: A5DS
-            scope: a5ds
-
-          - title: CSS
-            scope: css
-
-            deprecated:
-              - plat/arm/css
-              - plat/css
-
           - title: FPGA
             scope: fpga
 
             deprecated:
               - arm_fgpa
+              - arm_fpga
               - plat/arm_fpga
-              - arm/fpga
 
           - title: FVP
             scope: fvp
 
             deprecated:
               - plat/fvp
-              - fvp/tsp_manifest
 
           - title: FVP-R
             scope: fvp-r
 
             deprecated:
               - fvp_r
-
-          - title: FVP Versatile Express
-            scope: fvp_ve
 
           - title: Juno
             scope: juno
@@ -216,9 +174,6 @@ subsections:
             scope: rd
 
             subsections:
-              - title: RD-N1 Edge
-                scope: rdn1edge
-
               - title: RD-N2
                 scope: rdn2
 
@@ -235,9 +190,6 @@ subsections:
           - title: TC
             scope: tc
 
-            deprecated:
-              - plat/tc
-
             subsections:
               - title: TC0
                 scope: tc0
@@ -248,28 +200,8 @@ subsections:
           - title: Corstone-1000
             scope: corstone-1000
 
-      - title: Aspeed
-        scope: aspeed
-
-        subsections:
-          - title: AST2700
-            scope: ast2700
-
       - title: Broadcom
         scope: brcm
-
-      - title: Cadence
-        scope: cadence
-
-      - title: HiSilicon
-        scope: hisilicon
-
-        subsections:
-          - title: HiKey
-            scope: hikey
-
-          - title: HiKey960
-            scope: hikey960
 
       - title: Intel
         scope: intel
@@ -318,16 +250,6 @@ subsections:
             deprecated:
               - plat/mediatek/mt8183
 
-          - title: MT8186
-            scope: mt8186
-
-            deprecated:
-              - plat/mediatek/mt8186
-              - mt8186-emi-mpu
-
-          - title: MT8188
-            scope: mt8188
-
           - title: MT8192
             scope: mt8192
 
@@ -341,6 +263,12 @@ subsections:
               - plat/mediatek/me8195
               - plat/mediatek/mt8195
               - plat/mdeiatek/mt8195
+
+          - title: MT8186
+            scope: mt8186
+
+            deprecated:
+              - plat/mediatek/mt8186
 
       - title: NVIDIA
         scope: nvidia
@@ -358,9 +286,6 @@ subsections:
 
               - title: Tegra 194
                 scope: tegra194
-
-              - title: Tegra 210
-                scope: tegra210
 
       - title: NXP
         scope: nxp
@@ -409,16 +334,6 @@ subsections:
 
                     deprecated:
                       - plat/imx/imx8m/imx8mq
-
-              - title: i.MX 8
-                scope: imx8
-
-              - title: i.MX 9
-                scope: imx9
-
-                subsections:
-                  - title: i.MX93
-                    scope: imx93
 
           - title: Layerscape
             scope: layerscape
@@ -502,18 +417,8 @@ subsections:
         deprecated:
           - plat/qemu
 
-        subsections:
-          - title: SBSA
-            scope: qemu-sbsa
-
-            deprecated:
-              - qemu_sbsa
-
       - title: QTI
         scope: qti
-
-        deprecated:
-          - plat/qti
 
         subsections:
           - title: SC1780
@@ -535,9 +440,6 @@ subsections:
         scope: rpi
 
         subsections:
-          - title: Raspberry Pi 3
-            scope: rpi3
-
           - title: Raspberry Pi 4
             scope: rpi4
 
@@ -569,9 +471,6 @@ subsections:
               - rockchip/rk3399
               - rk3399/suspend
 
-          - title: RK3328
-            scope: rk3328
-
       - title: Socionext
         scope: socionext
 
@@ -602,18 +501,12 @@ subsections:
               - title: STM32MP15
                 scope: stm32mp15
 
-          - title: STM32MP2
-            scope: stm32mp2
-
       - title: Texas Instruments
         scope: ti
 
         subsections:
           - title: K3
             scope: k3
-
-            deprecated:
-              - ti-k3
 
       - title: Xilinx
         scope: xilinx
@@ -622,9 +515,6 @@ subsections:
           - plat/xilinx
 
         subsections:
-          - title: DCC (Debug Communication Channel)
-            scope: dcc
-
           - title: Versal
             scope: versal
 
@@ -633,26 +523,12 @@ subsections:
               - plat/xilinx/versal
               - plat/versal
 
-            subsections:
-             - title: Versal NET
-               scope: versal-net
-
-               deprecated:
-                 - versal_net
-
           - title: ZynqMP
             scope: zynqmp
 
             deprecated:
               - plat/zynqmp
               - plat/xilinx/zynqmp
-
-      - title: Nuvoton
-        scope: nuvoton
-
-        subsections:
-          - title: npcm845x
-            scope: npcm845x
 
   - title: Bootloader Images
     scope: bl
@@ -670,13 +546,6 @@ subsections:
       - title: BL31
         scope: bl31
 
-      - title: BL32
-        scope: bl32
-
-        subsections:
-          - title: TSP
-            scope: tsp
-
   - title: Services
     scope: services
 
@@ -690,9 +559,6 @@ subsections:
       - title: RME
         scope: rme
 
-        deprecated:
-          - rme/fid
-
         subsections:
           - title: TRP
             scope: trp
@@ -700,21 +566,12 @@ subsections:
           - title: RMMD
             scope: rmmd
 
-          - title: RMM
-            scope: rmm
-
       - title: SPM
         scope: spm
 
         subsections:
-          - title: EL3 SPM
-            scope: el3-spm
-
           - title: EL3 SPMC
             scope: el3-spmc
-
-            deprecated:
-              - spmc
 
           - title: SPMD
             scope: spmd
@@ -722,20 +579,7 @@ subsections:
           - title: SPM MM
             scope: spm-mm
 
-      - title: DRTM
-        scope: drtm
-
-      - title: TRNG
-        scope: trng
-
-      - title: ERRATA ABI
-        scope: errata-abi
-
-        deprecated:
-          - errata_abi
-
   - title: Libraries
-    scope: lib
 
     subsections:
       - title: CPU Support
@@ -755,9 +599,6 @@ subsections:
         subsections:
           - title: Context Management
             scope: cm
-
-          - title: RAS
-            scope: ras
 
       - title: FCONF
         scope: fconf
@@ -795,20 +636,8 @@ subsections:
       - title: PSA
         scope: psa
 
-        deprecated:
-          - lib/psa
-
       - title: Context Management
-        scope: context-mgmt
-
-        deprecated:
-          - context mgmt
-
-      - title: Semihosting
-        scope: semihosting
-
-      - title: Firmware Handoff
-        scope: handoff
+        scope: context mgmt
 
   - title: Drivers
 
@@ -822,18 +651,6 @@ subsections:
         subsections:
           - title: CryptoCell-713
             scope: cc-713
-
-          - title: Crypto
-            scope: crypto
-
-          - title: mbedTLS
-            scope: mbedtls
-
-          - title: mbedTLS-PSA
-            scope: mbedtls-psa
-
-      - title: Console
-        scope: console
 
       - title: Generic Clock
         scope: clk
@@ -887,16 +704,12 @@ subsections:
       - title: GUID Partition Tables Support
         scope: guid-partition
 
-        deprecated:
-          - partition
-
       - title: SCMI
         scope: scmi
 
         deprecated:
           - scmi_common
           - drivers/scmi-msg
-          - scmi-msg
 
       - title: UFS
         scope: ufs
@@ -918,18 +731,9 @@ subsections:
               - title: GICv3
                 scope: gicv3
 
-                deprecated:
-                  - gicv3/multichip
-
                 subsections:
-                  - title: GIC-600
-                    scope: gic600
-
                   - title: GIC-600AE
                     scope: gic600ae
-
-              - title: GICv2
-                scope: gicv2
 
           - title: SMMU
             scope: smmu
@@ -961,9 +765,6 @@ subsections:
 
                 deprecated:
                   - drivers/tzc380
-
-          - title: SBSA
-            scope: sbsa
 
       - title: Marvell
         scope: marvell-drivers
@@ -1092,9 +893,6 @@ subsections:
 
           - title: TZC-380
             scope: nxp-tzc380
-
-          - title: TRDC
-            scope: imx-trdc
 
       - title: Renesas
         scope: renesas-drivers
@@ -1260,14 +1058,8 @@ subsections:
               - title: STM32MP15
                 scope: stm32mp15-fdts
 
-          - title: STM32MP2
-            scope: stm32mp2-fdts
-
       - title: PIE
         scope: pie
-
-      - title: PIE/POR
-        scope: pie/por
 
       - title: Security
         scope: security
@@ -1292,9 +1084,6 @@ subsections:
 
             deprecated:
               - plat/nxp/common/psci
-
-      - title: UUID
-        scope: uuid
 
   - title: Documentation
     scope: docs
@@ -1325,9 +1114,6 @@ subsections:
       - title: Threat Model
         scope: threat-model
 
-      - title: Porting Guide
-        scope: porting
-
   - title: Build System
     scope: build
 
@@ -1338,9 +1124,6 @@ subsections:
     subsections:
       - title: Git Hooks
         scope: hooks
-
-        deprecated:
-          - git-hooks
 
   - title: Tools
 
@@ -1363,12 +1146,6 @@ subsections:
       - title: Certificate Creation Tool
         scope: cert-create
 
-      - title: Memory Mapping Tool
-        scope: memmap
-
-        deprecated:
-          - cert_create
-
   - title: Dependencies
     scope: deps
 
@@ -1379,17 +1156,8 @@ subsections:
       - title: commitlint
         scope: commitlint
 
-      - title: Compiler runtime libraries
-        scope: compiler-rt
-
       - title: libfdt
         scope: libfdt
 
       - title: Node Package Manager (NPM)
         scope: npm
-
-      - title: Poetry
-        scope: poetry
-
-      - title: zlib
-        scope: zlib

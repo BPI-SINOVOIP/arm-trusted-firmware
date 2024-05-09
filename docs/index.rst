@@ -3,7 +3,7 @@ Trusted Firmware-A Documentation
 
 .. toctree::
    :maxdepth: 1
-   :numbered:
+   :hidden:
 
    Home<self>
    about/index
@@ -11,13 +11,11 @@ Trusted Firmware-A Documentation
    process/index
    components/index
    design/index
-   porting-guide
    plat/index
    perf/index
    security_advisories/index
    design_documents/index
    threat_model/index
-   tools/index
    change-log
    glossary
    license
@@ -86,11 +84,11 @@ have previously been raised against the software.
 
 --------------
 
-*Copyright (c) 2013-2023, Arm Limited and Contributors. All rights reserved.*
+*Copyright (c) 2013-2021, Arm Limited and Contributors. All rights reserved.*
 
 .. _Armv7-A and Armv8-A: https://developer.arm.com/products/architecture/a-profile
 .. _Secure Monitor: http://www.arm.com/products/processors/technologies/trustzone/tee-smc.php
-.. _Power State Coordination Interface (PSCI): https://developer.arm.com/documentation/den0022/latest/
+.. _Power State Coordination Interface (PSCI): http://infocenter.arm.com/help/topic/com.arm.doc.den0022d/Power_State_Coordination_Interface_PDD_v1_1_DEN0022D.pdf
 .. _Trusted Board Boot Requirements CLIENT (TBBR-CLIENT): https://developer.arm.com/docs/den0006/latest/trusted-board-boot-requirements-client-tbbr-client-armv8-a
 .. _System Control and Management Interface (SCMI): http://infocenter.arm.com/help/topic/com.arm.doc.den0056a/DEN0056A_System_Control_and_Management_Interface.pdf
 .. _Software Delegated Exception Interface (SDEI): http://infocenter.arm.com/help/topic/com.arm.doc.den0054a/ARM_DEN0054A_Software_Delegated_Exception_Interface.pdf

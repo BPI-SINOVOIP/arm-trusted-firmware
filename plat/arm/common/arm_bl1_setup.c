@@ -11,7 +11,6 @@
 #include <arch.h>
 #include <bl1/bl1.h>
 #include <common/bl_common.h>
-#include <common/debug.h>
 #include <lib/fconf/fconf.h>
 #include <lib/fconf/fconf_dyn_cfg_getter.h>
 #include <lib/utils.h>
@@ -108,8 +107,11 @@ void bl1_early_platform_setup(void)
  *****************************************************************************/
 void arm_bl1_plat_arch_setup(void)
 {
-#if USE_COHERENT_MEM
-	/* Ensure ARM platforms don't use coherent memory in BL1. */
+#if USE_COHERENT_MEM && !ARM_CRYPTOCELL_INTEG
+	/*
+	 * Ensure ARM platforms don't use coherent memory in BL1 unless
+	 * cryptocell integration is enabled.
+	 */
 	assert((BL_COHERENT_RAM_END - BL_COHERENT_RAM_BASE) == 0U);
 #endif
 
@@ -119,6 +121,9 @@ void arm_bl1_plat_arch_setup(void)
 #if USE_ROMLIB
 		ARM_MAP_ROMLIB_CODE,
 		ARM_MAP_ROMLIB_DATA,
+#endif
+#if ARM_CRYPTOCELL_INTEG
+		ARM_MAP_BL_COHERENT_RAM,
 #endif
 		{0}
 	};

@@ -114,6 +114,3 @@ ERRATA_DDR_A050958	:= 1
 
 # enable dynamic memory mapping
 PLAT_XLAT_TABLES_DYNAMIC :=	1
-
-# OCRAM ECC Enabled
-OCRAM_ECC_EN            :=      yes

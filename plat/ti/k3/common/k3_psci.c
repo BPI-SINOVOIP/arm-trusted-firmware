@@ -205,14 +205,7 @@ void k3_pwr_domain_on_finish(const psci_power_state_t *target_state)
 
 static void __dead2 k3_system_off(void)
 {
-	int ret;
-
-	/* Queue up the system shutdown request */
-	ret = ti_sci_device_put_no_wait(PLAT_BOARD_DEVICE_ID);
-	if (ret != 0) {
-		ERROR("Sending system shutdown message failed (%d)\n", ret);
-	}
-
+	ERROR("System Off: operation not handled.\n");
 	while (true)
 		wfi();
 }
@@ -234,6 +227,14 @@ static int k3_validate_power_state(unsigned int power_state,
 	return PSCI_E_SUCCESS;
 }
 
+static int k3_validate_ns_entrypoint(uintptr_t entrypoint)
+{
+	/* TODO: perform the proper validation */
+
+	return PSCI_E_SUCCESS;
+}
+
+#if K3_PM_SYSTEM_SUSPEND
 static void k3_pwr_domain_suspend(const psci_power_state_t *target_state)
 {
 	unsigned int core, proc_id;
@@ -265,43 +266,28 @@ static void k3_get_sys_suspend_power_state(psci_power_state_t *req_state)
 		req_state->pwr_domain_state[i] = PLAT_MAX_OFF_STATE;
 	}
 }
+#endif
 
-static plat_psci_ops_t k3_plat_psci_ops = {
+static const plat_psci_ops_t k3_plat_psci_ops = {
 	.cpu_standby = k3_cpu_standby,
 	.pwr_domain_on = k3_pwr_domain_on,
 	.pwr_domain_off = k3_pwr_domain_off,
 	.pwr_domain_on_finish = k3_pwr_domain_on_finish,
+#if K3_PM_SYSTEM_SUSPEND
 	.pwr_domain_suspend = k3_pwr_domain_suspend,
 	.pwr_domain_suspend_finish = k3_pwr_domain_suspend_finish,
 	.get_sys_suspend_power_state = k3_get_sys_suspend_power_state,
+#endif
 	.system_off = k3_system_off,
 	.system_reset = k3_system_reset,
 	.validate_power_state = k3_validate_power_state,
+	.validate_ns_entrypoint = k3_validate_ns_entrypoint
 };
 
 int plat_setup_psci_ops(uintptr_t sec_entrypoint,
 			const plat_psci_ops_t **psci_ops)
 {
-	uint64_t fw_caps = 0;
-	int ret;
-
 	k3_sec_entrypoint = sec_entrypoint;
-
-	ret = ti_sci_query_fw_caps(&fw_caps);
-	if (ret) {
-		ERROR("Unable to query firmware capabilities (%d)\n", ret);
-	}
-
-	/* If firmware does not support any known suspend mode */
-	if (!(fw_caps & (MSG_FLAG_CAPS_LPM_DEEP_SLEEP |
-			 MSG_FLAG_CAPS_LPM_MCU_ONLY |
-			 MSG_FLAG_CAPS_LPM_STANDBY |
-			 MSG_FLAG_CAPS_LPM_PARTIAL_IO))) {
-		/* Disable PSCI suspend support */
-		k3_plat_psci_ops.pwr_domain_suspend = NULL;
-		k3_plat_psci_ops.pwr_domain_suspend_finish = NULL;
-		k3_plat_psci_ops.get_sys_suspend_power_state = NULL;
-	}
 
 	*psci_ops = &k3_plat_psci_ops;
 

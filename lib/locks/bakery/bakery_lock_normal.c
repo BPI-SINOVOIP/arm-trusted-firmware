@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2020, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015-2020, ARM Limited and Contributors. All rights reserved.
  * Copyright (c) 2020, NVIDIA Corporation. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
@@ -44,7 +44,7 @@
  * Using this value, if provided, rather than the linker generated value results in
  * more efficient code
  */
-CASSERT((PLAT_PERCPU_BAKERY_LOCK_SIZE & (CACHE_WRITEBACK_GRANULE - 1)) == 0,
+CASSERT((PLAT_PERCPU_BAKERY_LOCK_SIZE & (CACHE_WRITEBACK_GRANULE - 1)) == 0, \
 	PLAT_PERCPU_BAKERY_LOCK_SIZE_not_cacheline_multiple);
 #define PERCPU_BAKERY_LOCK_SIZE (PLAT_PERCPU_BAKERY_LOCK_SIZE)
 #else

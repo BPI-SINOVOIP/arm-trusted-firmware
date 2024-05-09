@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2018-2023, Arm Limited. All rights reserved.
+# Copyright (c) 2018-2022, Arm Limited. All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
 #
@@ -13,10 +13,6 @@ PLAT_INCLUDES		:=	-I${N1SDP_BASE}/include
 
 
 N1SDP_CPU_SOURCES	:=	lib/cpus/aarch64/neoverse_n1.S
-
-# Neoverse N1 cores support Armv8.2 extensions
-ARM_ARCH_MAJOR := 8
-ARM_ARCH_MINOR := 2
 
 # GIC-600 configuration
 GICV3_SUPPORT_GIC600		:=	1
@@ -51,7 +47,6 @@ BL31_SOURCES		:=	${N1SDP_CPU_SOURCES}			\
 				${INTERCONNECT_SOURCES}			\
 				${N1SDP_GIC_SOURCES}			\
 				${N1SDP_BASE}/n1sdp_bl31_setup.c	\
-				${N1SDP_BASE}/n1sdp_pm.c		\
 				${N1SDP_BASE}/n1sdp_topology.c	        \
 				${N1SDP_BASE}/n1sdp_security.c		\
 				drivers/arm/css/sds/sds.c

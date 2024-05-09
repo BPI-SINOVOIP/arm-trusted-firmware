@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2023, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015-2022, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -14,19 +14,17 @@
 #include <mbedtls/memory_buffer_alloc.h>
 #include <mbedtls/oid.h>
 #include <mbedtls/platform.h>
-#include <mbedtls/version.h>
 #include <mbedtls/x509.h>
 
 #include <common/debug.h>
 #include <drivers/auth/crypto_mod.h>
 #include <drivers/auth/mbedtls/mbedtls_common.h>
-
+#include <drivers/auth/mbedtls/mbedtls_config.h>
 #include <plat/common/platform.h>
 
 #define LIB_NAME		"mbed TLS"
 
-#if CRYPTO_SUPPORT == CRYPTO_HASH_CALC_ONLY || \
-CRYPTO_SUPPORT == CRYPTO_AUTH_VERIFY_AND_HASH_CALC
+#if MEASURED_BOOT
 /*
  * CRYPTO_MD_MAX_SIZE value is as per current stronger algorithm available
  * so make sure that mbed TLS MD maximum size must be lesser than this.
@@ -34,8 +32,7 @@ CRYPTO_SUPPORT == CRYPTO_AUTH_VERIFY_AND_HASH_CALC
 CASSERT(CRYPTO_MD_MAX_SIZE >= MBEDTLS_MD_MAX_SIZE,
 	assert_mbedtls_md_size_overflow);
 
-#endif /* CRYPTO_SUPPORT == CRYPTO_HASH_CALC_ONLY || \
-	  CRYPTO_SUPPORT == CRYPTO_AUTH_VERIFY_AND_HASH_CALC */
+#endif /* MEASURED_BOOT */
 
 /*
  * AlgorithmIdentifier  ::=  SEQUENCE  {
@@ -63,8 +60,7 @@ static void init(void)
 	mbedtls_init();
 }
 
-#if CRYPTO_SUPPORT == CRYPTO_AUTH_VERIFY_ONLY || \
-CRYPTO_SUPPORT == CRYPTO_AUTH_VERIFY_AND_HASH_CALC
+#if TRUSTED_BOARD_BOOT
 /*
  * Verify a signature.
  *
@@ -116,7 +112,7 @@ static int verify_signature(void *data_ptr, unsigned int data_len,
 	end = (unsigned char *)(p + sig_len);
 	signature.tag = *p;
 	rc = mbedtls_asn1_get_bitstring_null(&p, end, &signature.len);
-	if ((rc != 0) || ((size_t)(end - p) != signature.len)) {
+	if (rc != 0) {
 		rc = CRYPTO_ERR_SIGNATURE;
 		goto end1;
 	}
@@ -171,11 +167,7 @@ static int verify_hash(void *data_ptr, unsigned int data_len,
 	size_t len;
 	int rc;
 
-	/*
-	 * Digest info should be an MBEDTLS_ASN1_SEQUENCE, but padding after
-	 * it is allowed.  This is necessary to support multiple hash
-	 * algorithms.
-	 */
+	/* Digest info should be an MBEDTLS_ASN1_SEQUENCE */
 	p = (unsigned char *)digest_info_ptr;
 	end = p + digest_info_len;
 	rc = mbedtls_asn1_get_tag(&p, end, &len, MBEDTLS_ASN1_CONSTRUCTED |
@@ -183,8 +175,6 @@ static int verify_hash(void *data_ptr, unsigned int data_len,
 	if (rc != 0) {
 		return CRYPTO_ERR_HASH;
 	}
-
-	end = p + len;
 
 	/* Get the hash algorithm */
 	rc = mbedtls_asn1_get_alg(&p, end, &hash_oid, &params);
@@ -202,9 +192,9 @@ static int verify_hash(void *data_ptr, unsigned int data_len,
 		return CRYPTO_ERR_HASH;
 	}
 
-	/* Hash should be octet string type and consume all bytes */
+	/* Hash should be octet string type */
 	rc = mbedtls_asn1_get_tag(&p, end, &len, MBEDTLS_ASN1_OCTET_STRING);
-	if ((rc != 0) || ((size_t)(end - p) != len)) {
+	if (rc != 0) {
 		return CRYPTO_ERR_HASH;
 	}
 
@@ -229,11 +219,9 @@ static int verify_hash(void *data_ptr, unsigned int data_len,
 
 	return CRYPTO_SUCCESS;
 }
-#endif /* CRYPTO_SUPPORT == CRYPTO_AUTH_VERIFY_ONLY || \
-	  CRYPTO_SUPPORT == CRYPTO_AUTH_VERIFY_AND_HASH_CALC */
+#endif /* TRUSTED_BOARD_BOOT */
 
-#if CRYPTO_SUPPORT == CRYPTO_HASH_CALC_ONLY || \
-CRYPTO_SUPPORT == CRYPTO_AUTH_VERIFY_AND_HASH_CALC
+#if MEASURED_BOOT
 /*
  * Map a generic crypto message digest algorithm to the corresponding macro used
  * by Mbed TLS.
@@ -276,8 +264,7 @@ static int calc_hash(enum crypto_md_algo md_algo, void *data_ptr,
 	 */
 	return mbedtls_md(md_info, data_ptr, data_len, output);
 }
-#endif /* CRYPTO_SUPPORT == CRYPTO_HASH_CALC_ONLY || \
-	  CRYPTO_SUPPORT == CRYPTO_AUTH_VERIFY_AND_HASH_CALC */
+#endif /* MEASURED_BOOT */
 
 #if TF_MBEDTLS_USE_AES_GCM
 /*
@@ -298,7 +285,6 @@ static int aes_gcm_decrypt(void *data_ptr, size_t len, const void *key,
 	unsigned char *pt = data_ptr;
 	size_t dec_len;
 	int diff, i, rc;
-	size_t output_length __unused;
 
 	mbedtls_gcm_init(&ctx);
 
@@ -308,11 +294,7 @@ static int aes_gcm_decrypt(void *data_ptr, size_t len, const void *key,
 		goto exit_gcm;
 	}
 
-#if (MBEDTLS_VERSION_MAJOR < 3)
 	rc = mbedtls_gcm_starts(&ctx, MBEDTLS_GCM_DECRYPT, iv, iv_len, NULL, 0);
-#else
-	rc = mbedtls_gcm_starts(&ctx, MBEDTLS_GCM_DECRYPT, iv, iv_len);
-#endif
 	if (rc != 0) {
 		rc = CRYPTO_ERR_DECRYPTION;
 		goto exit_gcm;
@@ -321,12 +303,7 @@ static int aes_gcm_decrypt(void *data_ptr, size_t len, const void *key,
 	while (len > 0) {
 		dec_len = MIN(sizeof(buf), len);
 
-#if (MBEDTLS_VERSION_MAJOR < 3)
 		rc = mbedtls_gcm_update(&ctx, dec_len, pt, buf);
-#else
-		rc = mbedtls_gcm_update(&ctx, pt, dec_len, buf, sizeof(buf), &output_length);
-#endif
-
 		if (rc != 0) {
 			rc = CRYPTO_ERR_DECRYPTION;
 			goto exit_gcm;
@@ -337,12 +314,7 @@ static int aes_gcm_decrypt(void *data_ptr, size_t len, const void *key,
 		len -= dec_len;
 	}
 
-#if (MBEDTLS_VERSION_MAJOR < 3)
 	rc = mbedtls_gcm_finish(&ctx, tag_buf, sizeof(tag_buf));
-#else
-	rc = mbedtls_gcm_finish(&ctx, NULL, 0, &output_length, tag_buf, sizeof(tag_buf));
-#endif
-
 	if (rc != 0) {
 		rc = CRYPTO_ERR_DECRYPTION;
 		goto exit_gcm;
@@ -396,22 +368,21 @@ static int auth_decrypt(enum crypto_dec_algo dec_algo, void *data_ptr,
 /*
  * Register crypto library descriptor
  */
-#if CRYPTO_SUPPORT == CRYPTO_AUTH_VERIFY_AND_HASH_CALC
+#if MEASURED_BOOT && TRUSTED_BOARD_BOOT
 #if TF_MBEDTLS_USE_AES_GCM
 REGISTER_CRYPTO_LIB(LIB_NAME, init, verify_signature, verify_hash, calc_hash,
-		    auth_decrypt, NULL);
+		    auth_decrypt);
 #else
 REGISTER_CRYPTO_LIB(LIB_NAME, init, verify_signature, verify_hash, calc_hash,
-		    NULL, NULL);
+		    NULL);
 #endif
-#elif CRYPTO_SUPPORT == CRYPTO_AUTH_VERIFY_ONLY
+#elif TRUSTED_BOARD_BOOT
 #if TF_MBEDTLS_USE_AES_GCM
-REGISTER_CRYPTO_LIB(LIB_NAME, init, verify_signature, verify_hash, NULL,
-		    auth_decrypt, NULL);
+REGISTER_CRYPTO_LIB(LIB_NAME, init, verify_signature, verify_hash,
+		    auth_decrypt);
 #else
-REGISTER_CRYPTO_LIB(LIB_NAME, init, verify_signature, verify_hash, NULL,
-		    NULL, NULL);
+REGISTER_CRYPTO_LIB(LIB_NAME, init, verify_signature, verify_hash, NULL);
 #endif
-#elif CRYPTO_SUPPORT == CRYPTO_HASH_CALC_ONLY
-REGISTER_CRYPTO_LIB(LIB_NAME, init, NULL, NULL, calc_hash, NULL, NULL);
-#endif /* CRYPTO_SUPPORT == CRYPTO_AUTH_VERIFY_AND_HASH_CALC */
+#elif MEASURED_BOOT
+REGISTER_CRYPTO_LIB(LIB_NAME, init, calc_hash);
+#endif /* MEASURED_BOOT && TRUSTED_BOARD_BOOT */

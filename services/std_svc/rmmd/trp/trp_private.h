@@ -53,9 +53,5 @@ void trp_setup(uint64_t x0,
 	       uint64_t x2,
 	       uint64_t x3);
 
-/* Validate arguments for warm boot only */
-int trp_validate_warmboot_args(uint64_t x0, uint64_t x1,
-			       uint64_t x2, uint64_t x3);
-
 #endif /* __ASSEMBLER__ */
 #endif /* TRP_PRIVATE_H */

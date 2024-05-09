@@ -127,8 +127,5 @@ void config_clkmgr_handoff(handoff *hoff_ptr);
 uint32_t get_wdt_clk(void);
 uint32_t get_uart_clk(void);
 uint32_t get_mmc_clk(void);
-uint32_t get_mpu_clk(void);
-uint32_t get_cpu_clk(void);
-uint32_t get_mpu_periph_clk(void);
 
 #endif

@@ -11,21 +11,15 @@ ENCTOOL		?= encrypt_fw${BIN_EXT}
 BINARY		:= $(notdir ${ENCTOOL})
 OPENSSL_DIR	:= /usr
 
-
-MAKE_HELPERS_DIRECTORY := ../../make_helpers/
-include ${MAKE_HELPERS_DIRECTORY}build_macros.mk
-include ${MAKE_HELPERS_DIRECTORY}build_env.mk
-include ${MAKE_HELPERS_DIRECTORY}defaults.mk
-
 OBJECTS := src/encrypt.o \
            src/cmd_opt.o \
            src/main.o
 
 HOSTCCFLAGS := -Wall -std=c99
 
-# Select OpenSSL version flag according to the OpenSSL build selected
-# from setting the OPENSSL_DIR path.
-$(eval $(call SELECT_OPENSSL_API_VERSION))
+MAKE_HELPERS_DIRECTORY := ../../make_helpers/
+include ${MAKE_HELPERS_DIRECTORY}build_macros.mk
+include ${MAKE_HELPERS_DIRECTORY}build_env.mk
 
 ifeq (${DEBUG},1)
   HOSTCCFLAGS += -g -O0 -DDEBUG -DLOG_LEVEL=40
@@ -42,12 +36,6 @@ else
   Q :=
 endif
 
-HOSTCCFLAGS += ${DEFINES}
-# USING_OPENSSL3 flag will be added to the HOSTCCFLAGS variable with the proper
-# computed value.
-HOSTCCFLAGS += -DUSING_OPENSSL3=$(USING_OPENSSL3)
-
-
 # Make soft links and include from local directory otherwise wrong headers
 # could get pulled in from firmware tree.
 INC_DIR := -I ./include -I ../../include/tools_share -I ${OPENSSL_DIR}/include
@@ -63,9 +51,9 @@ LIB := -lssl -lcrypto
 
 HOSTCC ?= gcc
 
-.PHONY: all clean realclean --openssl
+.PHONY: all clean realclean
 
-all: --openssl ${BINARY}
+all: ${BINARY}
 
 ${BINARY}: ${OBJECTS} Makefile
 	@echo "  HOSTLD  $@"
@@ -76,11 +64,6 @@ ${BINARY}: ${OBJECTS} Makefile
 %.o: %.c
 	@echo "  HOSTCC  $<"
 	${Q}${HOSTCC} -c ${HOSTCCFLAGS} ${INC_DIR} $< -o $@
-
---openssl:
-ifeq ($(DEBUG),1)
-	@echo "Selected OpenSSL version: ${OPENSSL_CURRENT_VER}"
-endif
 
 clean:
 	$(call SHELL_DELETE_ALL, src/build_msg.o ${OBJECTS})

@@ -9,12 +9,12 @@ The TBB sequence starts when the platform is powered on and runs up
 to the stage where it hands-off control to firmware running in the normal
 world in DRAM. This is the cold boot path.
 
-TF-A also implements the `PSCI`_ as a runtime service. PSCI is the interface
-from normal world software to firmware implementing power management use-cases
-(for example, secondary CPU boot, hotplug and idle). Normal world software can
-access TF-A runtime services via the Arm SMC (Secure Monitor Call) instruction.
-The SMC instruction must be used as mandated by the SMC Calling Convention
-(`SMCCC`_).
+TF-A also implements the `Power State Coordination Interface PDD`_ as a
+runtime service. PSCI is the interface from normal world software to firmware
+implementing power management use-cases (for example, secondary CPU boot,
+hotplug and idle). Normal world software can access TF-A runtime services via
+the Arm SMC (Secure Monitor Call) instruction. The SMC instruction must be
+used as mandated by the SMC Calling Convention (`SMCCC`_).
 
 TF-A implements a framework for configuring and managing interrupts generated
 in either security state. The details of the interrupt management framework
@@ -27,10 +27,11 @@ tables. The details of this library can be found in
 TF-A can be built to support either AArch64 or AArch32 execution state.
 
 .. note::
-    The descriptions in this chapter are for the Arm TrustZone architecture.
-    For changes to the firmware design for the `Arm Confidential Compute
-    Architecture (Arm CCA)`_ please refer to the chapter :ref:`Realm Management
-    Extension (RME)`.
+
+ The descriptions in this chapter are for the Arm TrustZone architecture.
+ For changes to the firmware design for the
+ `Arm Confidential Compute Architecture (Arm CCA)`_ please refer to the
+ chapter :ref:`Realm Management Extension (RME)`.
 
 Cold boot
 ---------
@@ -130,12 +131,6 @@ convention:
    -  For other BL3x images, if the firmware configuration file is loaded by
       BL2, then its address is passed in ``arg0`` and if HW_CONFIG is loaded
       then its address is passed in ``arg1``.
-   -  In case SPMC_AT_EL3 is enabled, populate the BL32 image base, size and max
-      limit in the entry point information, since there is no platform function
-      to retrieve these in generic code. We choose ``arg2``, ``arg3`` and
-      ``arg4`` since the generic code uses ``arg1`` for stashing the SP manifest
-      size. The SPMC setup uses these arguments to update SP manifest with
-      actual SP's base address and it size.
    -  In case of the Arm FVP platform, FW_CONFIG address passed in ``arg1`` to
       BL31/SP_MIN, and the SOC_FW_CONFIG and HW_CONFIG details are retrieved
       from FW_CONFIG device tree.
@@ -250,6 +245,63 @@ BL1 performs minimal architectural initialization as follows.
    BL1 calls the ``reset_handler()`` function which in turn calls the CPU
    specific reset handler function (see the section: "CPU specific operations
    framework").
+
+-  Control register setup (for AArch64)
+
+   -  ``SCTLR_EL3``. Instruction cache is enabled by setting the ``SCTLR_EL3.I``
+      bit. Alignment and stack alignment checking is enabled by setting the
+      ``SCTLR_EL3.A`` and ``SCTLR_EL3.SA`` bits. Exception endianness is set to
+      little-endian by clearing the ``SCTLR_EL3.EE`` bit.
+
+   -  ``SCR_EL3``. The register width of the next lower exception level is set
+      to AArch64 by setting the ``SCR.RW`` bit. The ``SCR.EA`` bit is set to trap
+      both External Aborts and SError Interrupts in EL3. The ``SCR.SIF`` bit is
+      also set to disable instruction fetches from Non-secure memory when in
+      secure state.
+
+   -  ``CPTR_EL3``. Accesses to the ``CPACR_EL1`` register from EL1 or EL2, or the
+      ``CPTR_EL2`` register from EL2 are configured to not trap to EL3 by
+      clearing the ``CPTR_EL3.TCPAC`` bit. Access to the trace functionality is
+      configured not to trap to EL3 by clearing the ``CPTR_EL3.TTA`` bit.
+      Instructions that access the registers associated with Floating Point
+      and Advanced SIMD execution are configured to not trap to EL3 by
+      clearing the ``CPTR_EL3.TFP`` bit.
+
+   -  ``DAIF``. The SError interrupt is enabled by clearing the SError interrupt
+      mask bit.
+
+   -  ``MDCR_EL3``. The trap controls, ``MDCR_EL3.TDOSA``, ``MDCR_EL3.TDA`` and
+      ``MDCR_EL3.TPM``, are set so that accesses to the registers they control
+      do not trap to EL3. AArch64 Secure self-hosted debug is disabled by
+      setting the ``MDCR_EL3.SDD`` bit. Also ``MDCR_EL3.SPD32`` is set to
+      disable AArch32 Secure self-hosted privileged debug from S-EL1.
+
+-  Control register setup (for AArch32)
+
+   -  ``SCTLR``. Instruction cache is enabled by setting the ``SCTLR.I`` bit.
+      Alignment checking is enabled by setting the ``SCTLR.A`` bit.
+      Exception endianness is set to little-endian by clearing the
+      ``SCTLR.EE`` bit.
+
+   -  ``SCR``. The ``SCR.SIF`` bit is set to disable instruction fetches from
+      Non-secure memory when in secure state.
+
+   -  ``CPACR``. Allow execution of Advanced SIMD instructions at PL0 and PL1,
+      by clearing the ``CPACR.ASEDIS`` bit. Access to the trace functionality
+      is configured not to trap to undefined mode by clearing the
+      ``CPACR.TRCDIS`` bit.
+
+   -  ``NSACR``. Enable non-secure access to Advanced SIMD functionality and
+      system register access to implemented trace registers.
+
+   -  ``FPEXC``. Enable access to the Advanced SIMD and floating-point
+      functionality from all Exception levels.
+
+   -  ``CPSR.A``. The Asynchronous data abort interrupt is enabled by clearing
+      the Asynchronous data abort interrupt mask bit.
+
+   -  ``SDCR``. The ``SDCR.SPD`` field is set to disable AArch32 Secure
+      self-hosted privileged debug.
 
 Platform initialization
 ^^^^^^^^^^^^^^^^^^^^^^^
@@ -406,7 +458,8 @@ initialization is complete. Hence, BL2 populates a platform-specific area of
 memory with the entrypoint and Saved Program Status Register (``SPSR``) of the
 normal world software image. The entrypoint is the load address of the BL33
 image. The ``SPSR`` is determined as specified in Section 5.13 of the
-`PSCI`_. This information is passed to the EL3 Runtime Software.
+`Power State Coordination Interface PDD`_. This information is passed to the
+EL3 Runtime Software.
 
 AArch64 BL31 (EL3 Runtime Software) execution
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -431,8 +484,8 @@ to execute at EL3. On these platforms, TF-A BL1 is a waste of memory
 as its only purpose is to ensure TF-A BL2 is entered at S-EL1. To avoid
 this waste, a special mode enables BL2 to execute at EL3, which allows
 a non-TF-A Boot ROM to load and jump directly to BL2. This mode is selected
-when the build flag RESET_TO_BL2 is enabled.
-The main differences in this mode are:
+when the build flag BL2_AT_EL3 is enabled. The main differences in this
+mode are:
 
 #. BL2 includes the reset code and the mailbox mechanism to differentiate
    cold boot and warm boot. It runs at EL3 doing the arch
@@ -847,7 +900,7 @@ Registration
 A runtime service is registered using the ``DECLARE_RT_SVC()`` macro, specifying
 the name of the service, the range of OENs covered, the type of service and
 initialization and call handler functions. This macro instantiates a ``const struct rt_svc_desc`` for the service with these details (see ``runtime_svc.h``).
-This structure is allocated in a special ELF section ``.rt_svc_descs``, enabling
+This structure is allocated in a special ELF section ``rt_svc_descs``, enabling
 the framework to find all service descriptors included into BL31.
 
 The specific service for a SMC Function is selected based on the OEN and call
@@ -937,10 +990,9 @@ The service's ``handle()`` callback is provided with five of the SMC parameters
 directly, the others are saved into memory for retrieval (if needed) by the
 handler. The handler is also provided with an opaque ``handle`` for use with the
 supporting library for parameter retrieval, setting return values and context
-manipulation. The ``flags`` parameter indicates the security state of the caller
-and the state of the SVE hint bit per the SMCCCv1.3. The framework finally sets
-up the execution stack for the handler, and invokes the services ``handle()``
-function.
+manipulation; and with ``flags`` indicating the security state of the caller. The
+framework finally sets up the execution stack for the handler, and invokes the
+services ``handle()`` function.
 
 On return from the handler the result registers are populated in X0-X7 as needed
 before restoring the stack and CPU state and returning from the original SMC.
@@ -957,8 +1009,8 @@ TODO: Provide design walkthrough of PSCI implementation.
 
 The PSCI v1.1 specification categorizes APIs as optional and mandatory. All the
 mandatory APIs in PSCI v1.1, PSCI v1.0 and in PSCI v0.2 draft specification
-`PSCI`_ are implemented. The table lists the PSCI v1.1 APIs and their support
-in generic code.
+`Power State Coordination Interface PDD`_ are implemented. The table lists
+the PSCI v1.1 APIs and their support in generic code.
 
 An API implementation might have a dependency on platform code e.g. CPU_SUSPEND
 requires the platform to export a part of the implementation. Hence the level
@@ -1124,65 +1176,6 @@ returning through EL3 and running the non-trusted firmware (BL33):
    ``bl31_main()`` will set up the return to the normal world firmware BL33 and
    continue the boot process in the normal world.
 
-Exception handling in BL31
---------------------------
-
-When exception occurs, PE must execute handler corresponding to exception. The
-location in memory where the handler is stored is called the exception vector.
-For ARM architecture, exception vectors are stored in a table, called the exception
-vector table.
-
-Each EL (except EL0) has its own vector table, VBAR_ELn register stores the base
-of vector table. Refer to `AArch64 exception vector table`_
-
-Current EL with SP_EL0
-~~~~~~~~~~~~~~~~~~~~~~
-
--  Sync exception : Not expected except for BRK instruction, its debugging tool which
-   a programmer may place at specific points in a program, to check the state of
-   processor flags at these points in the code.
-
--  IRQ/FIQ : Unexpected exception, panic
-
--  SError : "plat_handle_el3_ea", defaults to panic
-
-Current EL with SP_ELx
-~~~~~~~~~~~~~~~~~~~~~~
-
--  Sync exception : Unexpected exception, panic
-
--  IRQ/FIQ : Unexpected exception, panic
-
--  SError : "plat_handle_el3_ea" Except for special handling of lower EL's SError exception
-   which gets triggered in EL3 when PSTATE.A is unmasked. Its only applicable when lower
-   EL's EA is routed to EL3 (FFH_SUPPORT=1).
-
-Lower EL Exceptions
-~~~~~~~~~~~~~~~~~~~
-
-Applies to all the exceptions in both AArch64/AArch32 mode of lower EL.
-
-Before handling any lower EL exception, we synchronize the errors at EL3 entry to ensure
-that any errors pertaining to lower EL is isolated/identified. If we continue without
-identifying these errors early on then these errors will trigger in EL3 (as SError from
-current EL) any time after PSTATE.A is unmasked. This is wrong because the error originated
-in lower EL but exception happened in EL3.
-
-To solve this problem, synchronize the errors at EL3 entry and check for any pending
-errors (async EA). If there is no pending error then continue with original exception.
-If there is a pending error then, handle them based on routing model of EA's. Refer to
-:ref:`Reliability, Availability, and Serviceability (RAS) Extensions` for details about
-routing models.
-
--  KFH : Reflect it back to lower EL using **reflect_pending_async_ea_to_lower_el()**
-
--  FFH : Handle the synchronized error first using **handle_pending_async_ea()** after
-   that continue with original exception. It is the only scenario where EL3 is capable
-   of doing nested exception handling.
-
-After synchronizing and handling lower EL SErrors, unmask EA (PSTATE.A) to ensure
-that any further EA's caused by EL3 are caught.
-
 Crash Reporting in BL31
 -----------------------
 
@@ -1309,9 +1302,8 @@ the BL1 and BL31 images. It in turn calls the platform and CPU specific reset
 handling functions.
 
 Details for implementing a CPU specific reset handler can be found in
-:ref:`firmware_design_cpu_specific_reset_handling`. Details for implementing a
-platform specific reset handler can be found in the :ref:`Porting Guide` (see
-the``plat_reset_handler()`` function).
+Section 8. Details for implementing a platform specific reset handler can be
+found in the :ref:`Porting Guide` (see the ``plat_reset_handler()`` function).
 
 When adding functionality to a reset handler, keep in mind that if a different
 reset handling behavior is required between the first and the subsequent
@@ -1337,7 +1329,7 @@ element of the array specifies the interrupt number and its attributes
 (priority, group, configuration). Each element of the array shall be populated
 by the macro ``INTR_PROP_DESC()``. The macro takes the following arguments:
 
-- 13-bit interrupt number,
+- 10-bit interrupt number,
 
 - 8-bit interrupt priority,
 
@@ -1405,38 +1397,12 @@ configuration, these CPU specific files must be included in the build by
 the platform makefile. The generic CPU specific operations framework code exists
 in ``lib/cpus/aarch64/cpu_helpers.S``.
 
-CPU PCS
-~~~~~~~
-
-All assembly functions in CPU files are asked to follow a modified version of
-the Procedure Call Standard (PCS) in their internals. This is done to ensure
-calling these functions from outside the file doesn't unexpectedly corrupt
-registers in the very early environment and to help the internals to be easier
-to understand. Please see the :ref:`firmware_design_cpu_errata_implementation`
-for any function specific restrictions.
-
-+--------------+---------------------------------+
-|   register   | use                             |
-+==============+=================================+
-|   x0 - x15   | scratch                         |
-+--------------+---------------------------------+
-|   x16, x17   | do not use (used by the linker) |
-+--------------+---------------------------------+
-|     x18      | do not use (platform register)  |
-+--------------+---------------------------------+
-|   x19 - x28  | callee saved                    |
-+--------------+---------------------------------+
-|   x29, x30   | FP, LR                          |
-+--------------+---------------------------------+
-
-.. _firmware_design_cpu_specific_reset_handling:
-
 CPU specific Reset Handling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 After a reset, the state of the CPU when it calls generic reset handler is:
-MMU turned off, both instruction and data caches turned off, not part
-of any coherency domain and no stack.
+MMU turned off, both instruction and data caches turned off and not part
+of any coherency domain.
 
 The BL entrypoint code first invokes the ``plat_reset_handler()`` to allow
 the platform to perform any system initialization required and any system
@@ -1446,9 +1412,10 @@ array and returns it. Note that only the part number and implementer fields
 in midr are used to find the matching ``cpu_ops`` entry. The ``reset_func()`` in
 the returned ``cpu_ops`` is then invoked which executes the required reset
 handling for that CPU and also any errata workarounds enabled by the platform.
+This function must preserve the values of general purpose registers x20 to x29.
 
-It should be defined using the ``cpu_reset_func_{start,end}`` macros and its
-body may only clobber x0 to x14 with x14 being the cpu_rev parameter.
+Refer to Section "Guidelines for Reset Handlers" for general guidelines
+regarding placement of code in a reset handler.
 
 CPU specific power down sequence
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1481,10 +1448,10 @@ reporting framework calls ``do_cpu_reg_dump`` which retrieves the matching
 be reported and a pointer to the ASCII list of register names in a format
 expected by the crash reporting framework.
 
-.. _firmware_design_cpu_errata_implementation:
+.. _firmware_design_cpu_errata_reporting:
 
-CPU errata implementation
-~~~~~~~~~~~~~~~~~~~~~~~~~
+CPU errata status reporting
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Errata workarounds for CPUs supported in TF-A are applied during both cold and
 warm boots, shortly after reset. Individual Errata workarounds are enabled as
@@ -1492,92 +1459,59 @@ build options. Some errata workarounds have potential run-time implications;
 therefore some are enabled by default, others not. Platform ports shall
 override build options to enable or disable errata as appropriate. The CPU
 drivers take care of applying errata workarounds that are enabled and applicable
-to a given CPU.
+to a given CPU. Refer to :ref:`arm_cpu_macros_errata_workarounds` for more
+information.
 
-Each erratum has a build flag in ``lib/cpus/cpu-ops.mk`` of the form:
-``ERRATA_<cpu_num>_<erratum_id>``. It also has a short description in
-:ref:`arm_cpu_macros_errata_workarounds` on when it should apply.
+Functions in CPU drivers that apply errata workaround must follow the
+conventions listed below.
 
-Errata framework
-^^^^^^^^^^^^^^^^
+The errata workaround must be authored as two separate functions:
 
-The errata framework is a convention and a small library to allow errata to be
-automatically discovered. It enables compliant errata to be automatically
-applied and reported at runtime (either by status reporting or the errata ABI).
+-  One that checks for errata. This function must determine whether that errata
+   applies to the current CPU. Typically this involves matching the current
+   CPUs revision and variant against a value that's known to be affected by the
+   errata. If the function determines that the errata applies to this CPU, it
+   must return ``ERRATA_APPLIES``; otherwise, it must return
+   ``ERRATA_NOT_APPLIES``. The utility functions ``cpu_get_rev_var`` and
+   ``cpu_rev_var_ls`` functions may come in handy for this purpose.
 
-To write a compliant mitigation for erratum number ``erratum_id`` on a cpu that
-declared itself (with ``declare_cpu_ops``) as ``cpu_name`` one needs 3 things:
+For an errata identified as ``E``, the check function must be named
+``check_errata_E``.
 
-#. A CPU revision checker function: ``check_erratum_<cpu_name>_<erratum_id>``
+This function will be invoked at different times, both from assembly and from
+C run time. Therefore it must follow AAPCS, and must not use stack.
 
-   It should check whether this erratum applies on this revision of this CPU.
-   It will be called with the CPU revision as its first parameter (x0) and
-   should return one of ``ERRATA_APPLIES`` or ``ERRATA_NOT_APPLIES``.
+-  Another one that applies the errata workaround. This function would call the
+   check function described above, and applies errata workaround if required.
 
-   It may only clobber x0 to x4. The rest should be treated as callee-saved.
-
-#. A workaround function: ``erratum_<cpu_name>_<erratum_id>_wa``
-
-   It should obtain the cpu revision (with ``cpu_get_rev_var``), call its
-   revision checker, and perform the mitigation, should the erratum apply.
-
-   It may only clobber x0 to x8. The rest should be treated as callee-saved.
-
-#. Register itself to the framework
-
-   Do this with
-   ``add_erratum_entry <cpu_name>, ERRATUM(<erratum_id>), <errata_flag>``
-   where the ``errata_flag`` is the enable flag in ``cpu-ops.mk`` described
-   above.
-
-See the next section on how to do this easily.
-
-.. note::
-
- CVEs have the format ``CVE_<year>_<number>``. To fit them in the framework, the
- ``erratum_id`` for the checker and the workaround functions become the
- ``number`` part of its name and the ``ERRATUM(<number>)`` part of the
- registration should instead be ``CVE(<year>, <number>)``. In the extremely
- unlikely scenario where a CVE and an erratum numbers clash, the CVE number
- should be prefixed with a zero.
-
- Also, their build flag should be ``WORKAROUND_CVE_<year>_<number>``.
-
-.. note::
-
- AArch32 uses the legacy convention. The checker function has the format
- ``check_errata_<erratum_id>`` and the workaround has the format
- ``errata_<cpu_number>_<erratum_id>_wa`` where ``cpu_number`` is the shortform
- letter and number name of the CPU.
-
- For CVEs the ``erratum_id`` also becomes ``cve_<year>_<number>``.
-
-Errata framework helpers
-^^^^^^^^^^^^^^^^^^^^^^^^
-
-Writing these errata involves lots of boilerplate and repetitive code. On
-AArch64 there are helpers to omit most of this. They are located in
-``include/lib/cpus/aarch64/cpu_macros.S`` and the preferred way to implement
-errata. Please see their comments on how to use them.
-
-The most common type of erratum workaround, one that just sets a "chicken" bit
-in some arbitrary register, would have an implementation for the Cortex-A77,
-erratum #1925769 like::
-
-    workaround_reset_start cortex_a77, ERRATUM(1925769), ERRATA_A77_1925769
-        sysreg_bit_set CORTEX_A77_CPUECTLR_EL1, CORTEX_A77_CPUECTLR_EL1_BIT_8
-    workaround_reset_end cortex_a77, ERRATUM(1925769)
-
-    check_erratum_ls cortex_a77, ERRATUM(1925769), CPU_REV(1, 1)
-
-Status reporting
-^^^^^^^^^^^^^^^^
+CPU drivers that apply errata workaround can optionally implement an assembly
+function that report the status of errata workarounds pertaining to that CPU.
+For a driver that registers the CPU, for example, ``cpux`` via ``declare_cpu_ops``
+macro, the errata reporting function, if it exists, must be named
+``cpux_errata_report``. This function will always be called with MMU enabled; it
+must follow AAPCS and may use stack.
 
 In a debug build of TF-A, on a CPU that comes out of reset, both BL1 and the
-runtime firmware (BL31 in AArch64, and BL32 in AArch32) will invoke a generic
-errata status reporting function. It will read the ``errata_entries`` list of
-that cpu and will report whether each known erratum was applied and, if not,
-whether it should have been.
+runtime firmware (BL31 in AArch64, and BL32 in AArch32) will invoke errata
+status reporting function, if one exists, for that type of CPU.
+
+To report the status of each errata workaround, the function shall use the
+assembler macro ``report_errata``, passing it:
+
+-  The build option that enables the errata;
+
+-  The name of the CPU: this must be the same identifier that CPU driver
+   registered itself with, using ``declare_cpu_ops``;
+
+-  And the errata identifier: the identifier must match what's used in the
+   errata's check function described above.
+
+The errata status reporting function will be called once per CPU type/errata
+combination during the software's active life time.
+
+It's expected that whenever an errata workaround is submitted to TF-A, the
+errata reporting function is appropriately extended to report its status as
+well.
 
 Reporting the status of errata workaround is for informational purpose only; it
 has no functional significance.
@@ -1682,10 +1616,8 @@ The following linker symbols are defined for this purpose:
 -  ``__RO_START__``
 -  ``__RO_END__``
 -  ``__TEXT_START__``
--  ``__TEXT_END_UNALIGNED__``
 -  ``__TEXT_END__``
 -  ``__RODATA_START__``
--  ``__RODATA_END_UNALIGNED__``
 -  ``__RODATA_END__``
 
 BL1's linker symbols
@@ -1827,10 +1759,6 @@ BL image during boot.
 
                    DRAM
     0xffffffff +----------+
-               | EL3 TZC  |
-    0xffe00000 |----------| (secure)
-               | AP TZC   |
-    0xff000000 +----------+
                :          :
     0x82100000 |----------|
                |HW_CONFIG |
@@ -1872,10 +1800,6 @@ BL image during boot.
 
                      DRAM
     0xffffffff +--------------+
-               |   EL3 TZC    |
-    0xffe00000 |--------------|  (secure)
-               |   AP TZC     |
-    0xff000000 +--------------+
                :              :
     0x82100000 |--------------|
                |  HW_CONFIG   |
@@ -1916,10 +1840,7 @@ BL image during boot.
 
                    DRAM
     0xffffffff +----------+
-               |  EL3 TZC |
-    0xffe00000 |----------|  (secure)
-               |  AP TZC  |
-               |  (BL32)  |
+               |  BL32    |  (secure)
     0xff000000 +----------+
                |          |
     0x82100000 |----------|
@@ -1959,20 +1880,6 @@ BL image during boot.
 
 ::
 
-                  DRAM
-    0xFFFFFFFF +----------+
-               |  SCP TZC |
-    0xFFE00000 |----------|
-               |  EL3 TZC |
-    0xFFC00000 |----------|  (secure)
-               |  AP TZC  |
-    0xFF000000 +----------+
-               |          |
-               :          :  (non-secure)
-               |          |
-    0x80000000 +----------+
-
-
                   Flash0
     0x0C000000 +----------+
                :          :
@@ -2002,14 +1909,9 @@ BL image during boot.
 ::
 
                    DRAM
-    0xFFFFFFFF +----------+
-               |  SCP TZC |
-    0xFFE00000 |----------|
-               |  EL3 TZC |
-    0xFFC00000 |----------|  (secure)
-               |  AP TZC  |
-               |  (BL32)  |
-    0xFF000000 +----------+
+    0xFFE00000 +----------+
+               |  BL32    |  (secure)
+    0xFF000000 |----------|
                |          |
                :          :  (non-secure)
                |          |
@@ -2262,7 +2164,7 @@ To use bakery locks when ``USE_COHERENT_MEM`` is disabled, the lock data structu
 has been redesigned. The changes utilise the characteristic of Lamport's Bakery
 algorithm mentioned earlier. The bakery_lock structure only allocates the memory
 for a single CPU. The macro ``DEFINE_BAKERY_LOCK`` allocates all the bakery locks
-needed for a CPU into a section ``.bakery_lock``. The linker allocates the memory
+needed for a CPU into a section ``bakery_lock``. The linker allocates the memory
 for other cores by using the total size allocated for the bakery_lock section
 and multiplying it with (PLATFORM_CORE_COUNT - 1). This enables software to
 perform software cache maintenance on the lock data structure without running
@@ -2290,7 +2192,7 @@ with n bakery locks are:
 
 ::
 
-    .bakery_lock section start
+    bakery_lock section start
     |----------------|
     | `bakery_info_t`| <-- Lock_0 per-CPU field
     |    Lock_0      |     for CPU0
@@ -2327,7 +2229,7 @@ with n bakery locks are:
 
 Consider a system of 2 CPUs with 'N' bakery locks as shown above. For an
 operation on Lock_N, the corresponding ``bakery_info_t`` in both CPU0 and CPU1
-``.bakery_lock`` section need to be fetched and appropriate cache operations need
+``bakery_lock`` section need to be fetched and appropriate cache operations need
 to be performed for each access.
 
 On Arm Platforms, bakery locks are used in psci (``psci_locks``) and power controller
@@ -2690,27 +2592,16 @@ TF-A makes use of Armv8-A Architecture Extensions where applicable. This
 section lists the usage of Architecture Extensions, and build flags
 controlling them.
 
-Build options
-~~~~~~~~~~~~~
+In general, and unless individually mentioned, the build options
+``ARM_ARCH_MAJOR`` and ``ARM_ARCH_MINOR`` select the Architecture Extension to
+target when building TF-A. Subsequent Arm Architecture Extensions are backward
+compatible with previous versions.
 
-``ARM_ARCH_MAJOR`` and ``ARM_ARCH_MINOR``
-
-These build options serve dual purpose
-
-- Determine the architecture extension support in TF-A build: All the mandatory
-  architectural features up to ``ARM_ARCH_MAJOR.ARM_ARCH_MINOR`` are included
-  and unconditionally enabled by TF-A build system.
-
-- ``ARM_ARCH_MAJOR`` and ``ARM_ARCH_MINOR`` are passed to a march.mk build utility
-  this will try to come up with an appropriate -march value to be passed to compiler
-  by probing the compiler and checking what's supported by the compiler and what's best
-  that can be used. But if platform provides a ``MARCH_DIRECTIVE`` then it will used
-  directly and compiler probing will be skipped.
-
-The build system requires that the platform provides a valid numeric value based on
-CPU architecture extension, otherwise it defaults to base Armv8.0-A architecture.
-Subsequent Arm Architecture versions also support extensions which were introduced
-in previous versions.
+The build system only requires that ``ARM_ARCH_MAJOR`` and ``ARM_ARCH_MINOR`` have a
+valid numeric value. These build options only control whether or not
+Architecture Extension-specific code is included in the build. Otherwise, TF-A
+targets the base Armv8.0-A architecture; i.e. as if ``ARM_ARCH_MAJOR`` == 8
+and ``ARM_ARCH_MINOR`` == 0, which are also their respective default values.
 
 .. seealso:: :ref:`Build Options`
 
@@ -2796,12 +2687,12 @@ Directive ``ARM_CORTEX_A<x>`` and ``ARM_WITH_NEON`` are used to set
 the toolchain  target architecture directive.
 
 Platform may choose to not define straight the toolchain target architecture
-directive by defining ``MARCH_DIRECTIVE``.
+directive by defining ``MARCH32_DIRECTIVE``.
 I.e:
 
 .. code:: make
 
-   MARCH_DIRECTIVE := -march=armv7-a
+   MARCH32_DIRECTIVE := -mach=armv7-a
 
 Code Structure
 --------------
@@ -2852,7 +2743,7 @@ kernel at boot time. These can be found in the ``fdts`` directory.
 
 -  `Trusted Board Boot Requirements CLIENT (TBBR-CLIENT) Armv8-A (ARM DEN0006D)`_
 
--  `PSCI`_
+-  `Power State Coordination Interface PDD`_
 
 -  `SMC Calling Convention`_
 
@@ -2860,14 +2751,15 @@ kernel at boot time. These can be found in the ``fdts`` directory.
 
 --------------
 
-*Copyright (c) 2013-2023, Arm Limited and Contributors. All rights reserved.*
+*Copyright (c) 2013-2022, Arm Limited and Contributors. All rights reserved.*
 
+.. _Power State Coordination Interface PDD: http://infocenter.arm.com/help/topic/com.arm.doc.den0022d/Power_State_Coordination_Interface_PDD_v1_1_DEN0022D.pdf
 .. _SMCCC: https://developer.arm.com/docs/den0028/latest
-.. _PSCI: https://developer.arm.com/documentation/den0022/latest/
+.. _PSCI: http://infocenter.arm.com/help/topic/com.arm.doc.den0022d/Power_State_Coordination_Interface_PDD_v1_1_DEN0022D.pdf
+.. _Power State Coordination Interface PDD: http://infocenter.arm.com/help/topic/com.arm.doc.den0022d/Power_State_Coordination_Interface_PDD_v1_1_DEN0022D.pdf
 .. _Arm ARM: https://developer.arm.com/docs/ddi0487/latest
 .. _SMC Calling Convention: https://developer.arm.com/docs/den0028/latest
 .. _Trusted Board Boot Requirements CLIENT (TBBR-CLIENT) Armv8-A (ARM DEN0006D): https://developer.arm.com/docs/den0006/latest/trusted-board-boot-requirements-client-tbbr-client-armv8-a
 .. _Arm Confidential Compute Architecture (Arm CCA): https://www.arm.com/why-arm/architecture/security-features/arm-confidential-compute-architecture
-.. _AArch64 exception vector table: https://developer.arm.com/documentation/100933/0100/AArch64-exception-vector-table
 
 .. |Image 1| image:: ../resources/diagrams/rt-svc-descs-layout.png

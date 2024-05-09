@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2023, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2019-2022, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -7,7 +7,6 @@
 #ifndef SPMD_PRIVATE_H
 #define SPMD_PRIVATE_H
 
-#include <common/bl_common.h>
 #include <context.h>
 
 /*******************************************************************************
@@ -52,14 +51,7 @@ typedef struct spmd_spm_core_context {
 	cpu_context_t cpu_ctx;
 	spmc_state_t state;
 	bool secure_interrupt_ongoing;
-#if ENABLE_SPMD_LP
-	uint8_t spmd_lp_sync_req_ongoing;
-#endif
 } spmd_spm_core_context_t;
-
-/* Flags to indicate ongoing requests for SPMD EL3 logical partitions */
-#define SPMD_LP_FFA_DIR_REQ_ONGOING		U(0x1)
-#define SPMD_LP_FFA_INFO_GET_REG_ONGOING	U(0x2)
 
 /*
  * Reserve ID for NS physical FFA Endpoint.
@@ -99,16 +91,6 @@ spmd_spm_core_context_t *spmd_get_context(void);
 
 int spmd_pm_secondary_ep_register(uintptr_t entry_point);
 bool spmd_check_address_in_binary_image(uint64_t address);
-
-/*
- * Platform hook in EL3 firmware to handle for Group0 secure interrupt.
- * Return values:
- *  0 = success
- *  otherwise it returns a negative value
- */
-int plat_spmd_handle_group0_interrupt(uint32_t id);
-
-uint64_t spmd_ffa_error_return(void *handle, int error_code);
 
 #endif /* __ASSEMBLER__ */
 

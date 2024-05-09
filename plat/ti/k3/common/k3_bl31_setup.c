@@ -20,20 +20,14 @@
 #include <k3_gicv3.h>
 #include <ti_sci.h>
 
-#define ADDR_DOWN(_adr) (_adr & XLAT_ADDR_MASK(2U))
-#define SIZE_UP(_adr, _sz) (round_up((_adr + _sz), XLAT_BLOCK_SIZE(2U)) - ADDR_DOWN(_adr))
-
-#define K3_MAP_REGION_FLAT(_adr, _sz, _attr) \
-	MAP_REGION_FLAT(ADDR_DOWN(_adr), SIZE_UP(_adr, _sz), _attr)
-
 /* Table of regions to map using the MMU */
 const mmap_region_t plat_k3_mmap[] = {
-	K3_MAP_REGION_FLAT(K3_USART_BASE,       K3_USART_SIZE,       MT_DEVICE | MT_RW | MT_SECURE),
-	K3_MAP_REGION_FLAT(K3_GIC_BASE,         K3_GIC_SIZE,         MT_DEVICE | MT_RW | MT_SECURE),
-	K3_MAP_REGION_FLAT(K3_GTC_BASE,         K3_GTC_SIZE,         MT_DEVICE | MT_RW | MT_SECURE),
-	K3_MAP_REGION_FLAT(SEC_PROXY_RT_BASE,   SEC_PROXY_RT_SIZE,   MT_DEVICE | MT_RW | MT_SECURE),
-	K3_MAP_REGION_FLAT(SEC_PROXY_SCFG_BASE, SEC_PROXY_SCFG_SIZE, MT_DEVICE | MT_RW | MT_SECURE),
-	K3_MAP_REGION_FLAT(SEC_PROXY_DATA_BASE, SEC_PROXY_DATA_SIZE, MT_DEVICE | MT_RW | MT_SECURE),
+	MAP_REGION_FLAT(K3_USART_BASE,       K3_USART_SIZE,       MT_DEVICE | MT_RW | MT_SECURE),
+	MAP_REGION_FLAT(K3_GIC_BASE,         K3_GIC_SIZE,         MT_DEVICE | MT_RW | MT_SECURE),
+	MAP_REGION_FLAT(K3_GTC_BASE,         K3_GTC_SIZE,         MT_DEVICE | MT_RW | MT_SECURE),
+	MAP_REGION_FLAT(SEC_PROXY_RT_BASE,   SEC_PROXY_RT_SIZE,   MT_DEVICE | MT_RW | MT_SECURE),
+	MAP_REGION_FLAT(SEC_PROXY_SCFG_BASE, SEC_PROXY_SCFG_SIZE, MT_DEVICE | MT_RW | MT_SECURE),
+	MAP_REGION_FLAT(SEC_PROXY_DATA_BASE, SEC_PROXY_DATA_SIZE, MT_DEVICE | MT_RW | MT_SECURE),
 	{ /* sentinel */ }
 };
 
@@ -69,8 +63,11 @@ static uint32_t k3_get_spsr_for_bl33_entry(void)
 void bl31_early_platform_setup2(u_register_t arg0, u_register_t arg1,
 				u_register_t arg2, u_register_t arg3)
 {
-	/* Initialize the console to provide early debug support */
-	k3_console_setup();
+	/* There are no parameters from BL2 if BL31 is a reset vector */
+	assert(arg0 == 0U);
+	assert(arg1 == 0U);
+
+	bl31_console_setup();
 
 #ifdef BL32_BASE
 	/* Populate entry point information for BL32 */
@@ -165,6 +162,14 @@ unsigned int plat_get_syscnt_freq2(void)
 	      SYS_COUNTER_FREQ_IN_TICKS);
 
 	return SYS_COUNTER_FREQ_IN_TICKS;
+}
+
+/*
+ * Empty function to prevent the console from being uninitialized after BL33 is
+ * started and allow us to see messages from BL31.
+ */
+void bl31_plat_runtime_setup(void)
+{
 }
 
 /*******************************************************************************

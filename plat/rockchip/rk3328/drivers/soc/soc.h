@@ -27,7 +27,7 @@ enum plls_id {
 	DPLL_ID,
 	CPLL_ID,
 	GPLL_ID,
-	RESERVE,
+	REVERVE,
 	NPLL_ID,
 	MAX_PLL,
 };

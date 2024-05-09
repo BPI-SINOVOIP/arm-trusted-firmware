@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <assert.h>
 #include <stdint.h>
 
 #include <arch_helpers.h>
@@ -795,7 +794,7 @@ static enum usb_action usb_dwc2_it_handler(void *handle, uint32_t *param)
 	uint32_t epint;
 	uint32_t epnum;
 	uint32_t temp;
-	enum usb_status __unused ret;
+	enum usb_status ret;
 
 	if (usb_dwc2_get_mode(handle) != USB_OTG_MODE_DEVICE) {
 		return USB_NOTHING;
@@ -948,7 +947,9 @@ static enum usb_action usb_dwc2_it_handler(void *handle, uint32_t *param)
 
 		/* Setup EP0 to receive SETUP packets */
 		ret = usb_dwc2_ep0_out_start(handle);
-		assert(ret == USBD_OK);
+		if (ret != USBD_OK) {
+			return ret;
+		}
 
 		mmio_write_32(usb_base_addr + OTG_GINTSTS, OTG_GINTSTS_USBRST);
 
@@ -958,7 +959,9 @@ static enum usb_action usb_dwc2_it_handler(void *handle, uint32_t *param)
 	/* Handle enumeration done interrupt */
 	if ((usb_dwc2_read_int(handle) & OTG_GINTSTS_ENUMDNE) != 0U) {
 		ret = usb_dwc2_activate_setup(handle);
-		assert(ret == USBD_OK);
+		if (ret != USBD_OK) {
+			return ret;
+		}
 
 		mmio_clrbits_32(usb_base_addr + OTG_GUSBCFG, OTG_GUSBCFG_TRDT);
 

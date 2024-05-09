@@ -1,6 +1,5 @@
 /*
- * Copyright (c) 2017-2019, Arm Limited and Contributors. All rights reserved.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (c) 2017-2019, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -18,9 +17,11 @@
 #include <lib/mmio.h>
 
 #include <ipi.h>
-#include "ipi_mailbox_svc.h"
 #include <plat_ipi.h>
 #include <plat_private.h>
+
+#include "ipi_mailbox_svc.h"
+#include "../../../services/spd/trusty/smcall.h"
 
 /*********************************************************************
  * Macros definitions
@@ -46,25 +47,21 @@
 #define UNSIGNED32_MASK			0xFFFFFFFFU /* 32bit mask */
 
 /**
- * ipi_smc_handler() - SMC handler for IPI SMC calls.
- * @smc_fid: Function identifier.
- * @x1: Arguments.
- * @x2: Arguments.
- * @x3: Arguments.
- * @x4: Arguments.
- * @cookie: Unused.
- * @handle: Pointer to caller's context structure.
- * @flags: SECURE_FLAG or NON_SECURE_FLAG.
+ * ipi_smc_handler() - SMC handler for IPI SMC calls
  *
- * Return: Unused.
+ * @smc_fid - Function identifier
+ * @x1 - x4 - Arguments
+ * @cookie  - Unused
+ * @handler - Pointer to caller's context structure
+ *
+ * @return  - Unused
  *
  * Determines that smc_fid is valid and supported PM SMC Function ID from the
  * list of pm_api_ids, otherwise completes the request with
- * the unknown SMC Function ID.
+ * the unknown SMC Function ID
  *
  * The SMC calls for PM service are forwarded from SIP Service SMC handler
- * function with rt_svc_handle signature.
- *
+ * function with rt_svc_handle signature
  */
 uint64_t ipi_smc_handler(uint32_t smc_fid, uint64_t x1, uint64_t x2,
 			 uint64_t x3, uint64_t x4, const void *cookie,
@@ -78,23 +75,17 @@ uint64_t ipi_smc_handler(uint32_t smc_fid, uint64_t x1, uint64_t x2,
 	ipi_local_id = x1 & UNSIGNED32_MASK;
 	ipi_remote_id = x2 & UNSIGNED32_MASK;
 
-	/* OEN Number 48 to 63 is for Trusted App and OS
-	 * GET_SMC_OEN limits the return value of OEN number to 63 by bitwise
-	 * AND operation with 0x3F.
-	 * Upper limit check for OEN value is not required.
-	 */
-	if (GET_SMC_OEN(smc_fid) >= OEN_TAP_START) {
+	if (SMC_ENTITY(smc_fid) >= SMC_ENTITY_TRUSTED_APP)
 		is_secure = 1;
-	} else {
+	else
 		is_secure = 0;
-	}
 
 	/* Validate IPI mailbox access */
 	ret = ipi_mb_validate(ipi_local_id, ipi_remote_id, is_secure);
 	if (ret)
 		SMC_RET1(handle, ret);
 
-	switch (GET_SMC_NUM(smc_fid)) {
+	switch (SMC_FUNCTION(smc_fid)) {
 	case IPI_MAILBOX_OPEN:
 		ipi_mb_open(ipi_local_id, ipi_remote_id);
 		SMC_RET1(handle, 0);

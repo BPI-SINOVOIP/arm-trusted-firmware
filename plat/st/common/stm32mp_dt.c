@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2023, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2017-2022, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -79,8 +79,11 @@ uint8_t fdt_get_status(int node)
 	}
 
 	cchar = fdt_getprop(fdt, node, "secure-status", NULL);
-	if (((cchar == NULL) && (status == DT_NON_SECURE)) ||
-	    ((cchar != NULL) && (strncmp(cchar, "okay", strlen("okay")) == 0))) {
+	if (cchar == NULL) {
+		if (status == DT_NON_SECURE) {
+			status |= DT_SECURE;
+		}
+	} else if (strncmp(cchar, "okay", strlen("okay")) == 0) {
 		status |= DT_SECURE;
 	}
 
@@ -228,9 +231,9 @@ int dt_match_instance_by_compatible(const char *compatible, uintptr_t address)
  * This function gets DDR size information from the DT.
  * Returns value in bytes on success, and 0 on failure.
  ******************************************************************************/
-size_t dt_get_ddr_size(void)
+uint32_t dt_get_ddr_size(void)
 {
-	static size_t size;
+	static uint32_t size;
 	int node;
 
 	if (size != 0U) {
@@ -240,12 +243,12 @@ size_t dt_get_ddr_size(void)
 	node = fdt_node_offset_by_compatible(fdt, -1, DT_DDR_COMPAT);
 	if (node < 0) {
 		INFO("%s: Cannot read DDR node in DT\n", __func__);
-		return 0U;
+		return 0;
 	}
 
-	size = (size_t)fdt_read_uint32_default(fdt, node, "st,mem-size", 0U);
+	size = fdt_read_uint32_default(fdt, node, "st,mem-size", 0U);
 
-	flush_dcache_range((uintptr_t)&size, sizeof(size_t));
+	flush_dcache_range((uintptr_t)&size, sizeof(uint32_t));
 
 	return size;
 }
@@ -347,7 +350,7 @@ int dt_find_otp_name(const char *name, uint32_t *otp, uint32_t *otp_len)
 		return -FDT_ERR_BADVALUE;
 	}
 
-	if ((fdt32_to_cpu(*cuint) % sizeof(uint32_t)) != 0U) {
+	if (fdt32_to_cpu(*cuint) % sizeof(uint32_t)) {
 		ERROR("Misaligned nvmem %s element: ignored\n", name);
 		return -FDT_ERR_BADVALUE;
 	}
@@ -383,7 +386,7 @@ int fdt_get_gpio_bank_pin_count(unsigned int bank)
 
 	fdt_for_each_subnode(node, fdt, pinctrl_node) {
 		const fdt32_t *cuint;
-		int pin_count = 0;
+		int pin_count;
 		int len;
 		int i;
 
@@ -412,9 +415,11 @@ int fdt_get_gpio_bank_pin_count(unsigned int bank)
 		}
 
 		/* Get the last defined gpio line (offset + nb of pins) */
-		for (i = 0; i < len; i += 4) {
-			pin_count = MAX(pin_count, (int)(fdt32_to_cpu(cuint[i + 1]) +
-							 fdt32_to_cpu(cuint[i + 3])));
+		pin_count = fdt32_to_cpu(*(cuint + 1)) + fdt32_to_cpu(*(cuint + 3));
+		for (i = 0; i < len / 4; i++) {
+			pin_count = MAX(pin_count, (int)(fdt32_to_cpu(*(cuint + 1)) +
+							 fdt32_to_cpu(*(cuint + 3))));
+			cuint += 4;
 		}
 
 		return pin_count;

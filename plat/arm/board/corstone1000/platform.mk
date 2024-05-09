@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2021-2023, Arm Limited and Contributors. All rights reserved.
+# Copyright (c) 2021-2022, Arm Limited and Contributors. All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
 #
@@ -43,7 +43,6 @@ BL2_SOURCES		+=	plat/arm/board/corstone1000/common/corstone1000_security.c		\
 				plat/arm/board/corstone1000/common/corstone1000_err.c		\
 				plat/arm/board/corstone1000/common/corstone1000_trusted_boot.c	\
 				lib/utils/mem_region.c					\
-				lib/cpus/aarch64/cpu_helpers.S \
 				plat/arm/board/corstone1000/common/corstone1000_helpers.S		\
 				plat/arm/board/corstone1000/common/corstone1000_plat.c		\
 				plat/arm/board/corstone1000/common/corstone1000_bl2_mem_params_desc.c \
@@ -57,7 +56,6 @@ BL31_SOURCES	+=	drivers/cfi/v2m/v2m_flash.c				\
 			plat/arm/board/corstone1000/common/corstone1000_security.c		\
 			plat/arm/board/corstone1000/common/corstone1000_plat.c		\
 			plat/arm/board/corstone1000/common/corstone1000_pm.c		\
-			plat/arm/board/corstone1000/common/corstone1000_bl31_setup.c	\
 			${CORSTONE1000_CPU_LIBS}					\
 			${CORSTONE1000_GIC_SOURCES}
 

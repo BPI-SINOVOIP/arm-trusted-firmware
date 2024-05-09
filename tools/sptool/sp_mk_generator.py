@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-# Copyright (c) 2020-2023, Arm Limited. All rights reserved.
+# Copyright (c) 2020-2022, Arm Limited. All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
@@ -21,7 +21,6 @@ param1: Generated mk file "sp_gen.mk"
 param2: "SP_LAYOUT_FILE", json file containing platform provided information
 param3: plat out directory
 param4: CoT parameter
-param5: Generated dts file "sp_list_fragment.dts"
 
 Generated "sp_gen.mk" file contains triplet of following information for each
 Secure Partition entry
@@ -91,7 +90,7 @@ def get_sp_pkg(sp, args :dict):
 def is_line_in_sp_gen(line, args :dict):
     with open(args["sp_gen_mk"], "r") as f:
         sppkg_rule = [l for l in f if line in l]
-    return len(sppkg_rule) != 0
+    return len(sppkg_rule) is not 0
 
 def get_file_from_layout(node):
     ''' Helper to fetch a file path from sp_layout.json. '''
@@ -113,34 +112,6 @@ def get_pm_offset(node):
     ''' Helper to fetch pm offset from sp_layout.json '''
     return get_offset_from_layout(node["pm"])
 
-def get_uuid(sp_layout, sp, args :dict):
-    ''' Helper to fetch uuid from pm file listed in sp_layout.json'''
-    if "uuid" in sp_layout[sp]:
-        # Extract the UUID from the JSON file if the SP entry has a 'uuid' field
-        uuid_std = uuid.UUID(sp_layout[sp]['uuid'])
-    else:
-        with open(get_sp_manifest_full_path(sp_layout[sp], args), "r") as pm_f:
-            uuid_lines = [l for l in pm_f if 'uuid' in l]
-        assert(len(uuid_lines) == 1)
-        # The uuid field in SP manifest is the little endian representation
-        # mapped to arguments as described in SMCCC section 5.3.
-        # Convert each unsigned integer value to a big endian representation
-        # required by fiptool.
-        uuid_parsed = re.findall("0x([0-9a-f]+)", uuid_lines[0])
-        y = list(map(bytearray.fromhex, uuid_parsed))
-        z = [int.from_bytes(i, byteorder='little', signed=False) for i in y]
-        uuid_std = uuid.UUID(f'{z[0]:08x}{z[1]:08x}{z[2]:08x}{z[3]:08x}')
-    return uuid_std
-
-def get_load_address(sp_layout, sp, args :dict):
-    ''' Helper to fetch load-address from pm file listed in sp_layout.json'''
-    with open(get_sp_manifest_full_path(sp_layout[sp], args), "r") as pm_f:
-        load_address_lines = [l for l in pm_f if 'load-address' in l]
-    assert(len(load_address_lines) == 1)
-    load_address_parsed = re.search("(0x[0-9a-f]+)", load_address_lines[0])
-    return load_address_parsed.group(0)
-
-
 @SpSetupActions.sp_action(global_action=True)
 def check_max_sps(sp_layout, _, args :dict):
     ''' Check validate the maximum number of SPs is respected. '''
@@ -161,21 +132,20 @@ def gen_sptool_args(sp_layout, sp, args :dict):
     sp_pkg = get_sp_pkg(sp, args)
     sp_dtb_name = os.path.basename(get_file_from_layout(sp_layout[sp]["pm"]))[:-1] + "b"
     sp_dtb = os.path.join(args["out_dir"], f"fdts/{sp_dtb_name}")
-    sp_img = get_sp_img_full_path(sp_layout[sp], args)
 
     # Do not generate rule if already there.
     if is_line_in_sp_gen(f'{sp_pkg}:', args):
         return args
     write_to_sp_mk_gen(f"SP_PKGS += {sp_pkg}\n", args)
 
-    sptool_args = f" -i {sp_img}:{sp_dtb}"
+    sptool_args = f" -i {get_sp_img_full_path(sp_layout[sp], args)}:{sp_dtb}"
     pm_offset = get_pm_offset(sp_layout[sp])
     sptool_args += f" --pm-offset {pm_offset}" if pm_offset is not None else ""
     image_offset = get_image_offset(sp_layout[sp])
     sptool_args += f" --img-offset {image_offset}" if image_offset is not None else ""
     sptool_args += f" -o {sp_pkg}"
     sppkg_rule = f'''
-{sp_pkg}: {sp_dtb} {sp_img}
+{sp_pkg}: {sp_dtb}
 \t$(Q)echo Generating {sp_pkg}
 \t$(Q)$(PYTHON) $(SPTOOL) {sptool_args}
 '''
@@ -224,53 +194,37 @@ def gen_crt_args(sp_layout, sp, args :dict):
 @SpSetupActions.sp_action
 def gen_fiptool_args(sp_layout, sp, args :dict):
     ''' Generate arguments for the FIP Tool. '''
-    uuid_std = get_uuid(sp_layout, sp, args)
+    if "uuid" in sp_layout[sp]:
+        # Extract the UUID from the JSON file if the SP entry has a 'uuid' field
+        uuid_std = uuid.UUID(data[key]['uuid'])
+    else:
+        with open(get_sp_manifest_full_path(sp_layout[sp], args), "r") as pm_f:
+            uuid_lines = [l for l in pm_f if 'uuid' in l]
+        assert(len(uuid_lines) is 1)
+        # The uuid field in SP manifest is the little endian representation
+        # mapped to arguments as described in SMCCC section 5.3.
+        # Convert each unsigned integer value to a big endian representation
+        # required by fiptool.
+        uuid_parsed = re.findall("0x([0-9a-f]+)", uuid_lines[0])
+        y = list(map(bytearray.fromhex, uuid_parsed))
+        z = [int.from_bytes(i, byteorder='little', signed=False) for i in y]
+        uuid_std = uuid.UUID(f'{z[0]:08x}{z[1]:08x}{z[2]:08x}{z[3]:08x}')
     write_to_sp_mk_gen(f"FIP_ARGS += --blob uuid={str(uuid_std)},file={get_sp_pkg(sp, args)}\n", args)
     return args
 
-@SpSetupActions.sp_action
-def gen_fconf_fragment(sp_layout, sp, args: dict):
-    ''' Generate the fconf fragment file'''
-    with open(args["fconf_fragment"], "a") as f:
-        uuid = get_uuid(sp_layout, sp, args)
-        owner = "Plat" if sp_layout[sp].get("owner") == "Plat" else "SiP"
-
-        if "physical-load-address" in sp_layout[sp].keys():
-            load_address = sp_layout[sp]["physical-load-address"]
-        else:
-            load_address = get_load_address(sp_layout, sp, args)
-
-        f.write(
-f'''\
-{sp} {{
-    uuid = "{uuid}";
-    load-address = <{load_address}>;
-    owner = "{owner}";
-}};
-
-''')
-    return args
-
 def init_sp_actions(sys):
+    sp_layout_file = os.path.abspath(sys.argv[2])
+    with open(sp_layout_file) as json_file:
+        sp_layout = json.load(json_file)
     # Initialize arguments for the SP actions framework
     args = {}
     args["sp_gen_mk"] = os.path.abspath(sys.argv[1])
-    sp_layout_file = os.path.abspath(sys.argv[2])
     args["sp_layout_dir"] = os.path.dirname(sp_layout_file)
     args["out_dir"] = os.path.abspath(sys.argv[3])
     args["dualroot"] = sys.argv[4] == "dualroot"
-    args["fconf_fragment"] = os.path.abspath(sys.argv[5])
-
-
-    with open(sp_layout_file) as json_file:
-        sp_layout = json.load(json_file)
     #Clear content of file "sp_gen.mk".
     with open(args["sp_gen_mk"], "w"):
         None
-    #Clear content of file "fconf_fragment".
-    with open(args["fconf_fragment"], "w"):
-        None
-
     return args, sp_layout
 
 if __name__ == "__main__":

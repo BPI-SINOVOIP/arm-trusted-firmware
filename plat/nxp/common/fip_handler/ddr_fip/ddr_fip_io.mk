@@ -1,6 +1,5 @@
 #
 # Copyright 2020 NXP
-# Copyright (c) 2023, Arm Limited. All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
 #
@@ -22,6 +21,8 @@ PLAT_INCLUDES		+= -I${FIP_HANDLER_COMMON_PATH}\
 			   -I$(DDR_FIP_IO_STORAGE_PATH)
 
 DDR_FIP_IO_SOURCES	+= $(DDR_FIP_IO_STORAGE_PATH)/ddr_io_storage.c
+
+$(shell cp tools/nxp/plat_fiptool/plat_fiptool.mk ${PLAT_DIR})
 
 ifeq (${BL_COMM_DDR_FIP_IO_NEEDED},yes)
 BL_COMMON_SOURCES	+= ${DDR_FIP_IO_SOURCES}

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2022, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -36,7 +36,7 @@ static void spmc_build_pm_message(gp_regs_t *gpregs,
 }
 
 /*******************************************************************************
- * This CPU has been turned on. Enter the SP to initialise S-EL0 or S-EL1.
+ * This CPU has been turned on. Enter the SP to initialise S-EL1.
  ******************************************************************************/
 static void spmc_cpu_on_finish_handler(u_register_t unused)
 {
@@ -48,19 +48,6 @@ static void spmc_cpu_on_finish_handler(u_register_t unused)
 
 	/* Sanity check for a NULL pointer dereference. */
 	assert(sp != NULL);
-
-	/* Obtain a reference to the SP execution context */
-	ec = &sp->ec[get_ec_index(sp)];
-
-	/*
-	 * In case of a S-EL0 SP, only initialise the context data structure for
-	 * the secure world on this cpu and return.
-	 */
-	if (sp->runtime_el == S_EL0) {
-		/* Assign the context of the SP to this CPU */
-		cm_set_context(&(ec->cpu_ctx), SECURE);
-		return;
-	}
 
 	/* Initialize entry point information for the SP. */
 	SET_PARAM_HEAD(&sec_ec_ep_info, PARAM_EP, VERSION_1,
@@ -96,7 +83,6 @@ static void spmc_cpu_on_finish_handler(u_register_t unused)
 	/* Update the runtime model and state of the partition. */
 	ec->rt_model = RT_MODEL_INIT;
 	ec->rt_state = RT_STATE_RUNNING;
-	ec->dir_req_origin_id = INV_SP_ID;
 
 	INFO("SP (0x%x) init start on core%u.\n", sp->sp_id, linear_id);
 
@@ -146,7 +132,6 @@ static int32_t spmc_send_pm_msg(uint8_t pm_msg_type,
 	/* Update the runtime model and state of the partition. */
 	ec->rt_model = RT_MODEL_DIR_REQ;
 	ec->rt_state = RT_STATE_RUNNING;
-	ec->dir_req_origin_id = FFA_SPMC_ID;
 
 	rc = spmc_sp_synchronous_entry(ec);
 	if (rc != 0ULL) {

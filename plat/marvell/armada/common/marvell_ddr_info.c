@@ -34,7 +34,7 @@
 	DRAM_AREA_LENGTH_MASK) >> DRAM_AREA_LENGTH_OFFS
 
 /* Mapping between DDR area length and real DDR size is specific and looks like
- * below:
+ * bellow:
  * 0 => 384 MB
  * 1 => 768 MB
  * 2 => 1536 MB

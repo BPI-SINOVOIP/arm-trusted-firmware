@@ -1,19 +1,16 @@
 /*
- * Copyright (c) 2020-2023, Arm Limited. All rights reserved.
+ * Copyright (c) 2020-2022, Arm Limited. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
 #include <stddef.h>
 
-#include <mbedtls/version.h>
-
-#include <common/tbbr/cot_def.h>
-#include <drivers/auth/auth_mod.h>
-
-#include <tools_share/dualroot_oid.h>
-
 #include <platform_def.h>
+
+#include MBEDTLS_CONFIG_FILE
+#include <drivers/auth/auth_mod.h>
+#include <tools_share/dualroot_oid.h>
 
 /*
  * Allocate static buffers to store the authentication parameters extracted from

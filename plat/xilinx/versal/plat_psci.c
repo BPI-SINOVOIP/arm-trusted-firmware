@@ -1,23 +1,21 @@
 /*
- * Copyright (c) 2018-2021, Arm Limited and Contributors. All rights reserved.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (c) 2018-2021, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
 #include <assert.h>
-
+#include <plat_arm.h>
+#include <plat_private.h>
+#include <pm_common.h>
 #include <common/debug.h>
 #include <lib/mmio.h>
 #include <lib/psci/psci.h>
-#include <plat/arm/common/plat_arm.h>
 #include <plat/common/platform.h>
-#include <plat_arm.h>
+#include <plat/arm/common/plat_arm.h>
 
-#include <plat_private.h>
 #include "pm_api_sys.h"
 #include "pm_client.h"
-#include <pm_common.h>
 
 static uintptr_t versal_sec_entry;
 
@@ -46,9 +44,9 @@ static int32_t versal_pwr_domain_on(u_register_t mpidr)
 
 /**
  * versal_pwr_domain_suspend() - This function sends request to PMC to suspend
- *                               core.
- * @target_state: Targated state.
+ * core.
  *
+ * @target_state	Targated state
  */
 static void versal_pwr_domain_suspend(const psci_power_state_t *target_state)
 {
@@ -83,9 +81,9 @@ static void versal_pwr_domain_suspend(const psci_power_state_t *target_state)
 
 /**
  * versal_pwr_domain_suspend_finish() - This function performs actions to finish
- *                                      suspend procedure.
- * @target_state: Targated state.
+ * suspend procedure.
  *
+ * @target_state	Targated state
  */
 static void versal_pwr_domain_suspend_finish(
 					const psci_power_state_t *target_state)
@@ -122,9 +120,8 @@ void versal_pwr_domain_on_finish(const psci_power_state_t *target_state)
 }
 
 /**
- * versal_system_off() - This function sends the system off request to firmware.
- *                       This function does not return.
- *
+ * versal_system_off() - This function sends the system off request
+ * to firmware.  This function does not return.
  */
 static void __dead2 versal_system_off(void)
 {
@@ -138,10 +135,8 @@ static void __dead2 versal_system_off(void)
 }
 
 /**
- * versal_system_reset() - This function sends the reset request to firmware
- *                         for the system to reset.  This function does not
- *			   return.
- *
+ * versal_system_reset() - This function sends the reset request
+ * to firmware for the system to reset.  This function does not return.
  */
 static void __dead2 versal_system_reset(void)
 {
@@ -155,9 +150,9 @@ static void __dead2 versal_system_reset(void)
 }
 
 /**
- * versal_pwr_domain_off() - This function performs actions to turn off core.
- * @target_state: Targated state.
+ * versal_pwr_domain_off() - This function performs actions to turn off core
  *
+ * @target_state	Targated state
  */
 static void versal_pwr_domain_off(const psci_power_state_t *target_state)
 {
@@ -186,12 +181,12 @@ static void versal_pwr_domain_off(const psci_power_state_t *target_state)
 
 /**
  * versal_validate_power_state() - This function ensures that the power state
- *                                 parameter in request is valid.
- * @power_state: Power state of core.
- * @req_state: Requested state.
+ * parameter in request is valid.
  *
- * Return: Returns status, either success or reason.
+ * @power_state		Power state of core
+ * @req_state		Requested state
  *
+ * @return	Returns status, either success or reason
  */
 static int32_t versal_validate_power_state(uint32_t power_state,
 				       psci_power_state_t *req_state)
@@ -218,9 +213,9 @@ static int32_t versal_validate_power_state(uint32_t power_state,
 }
 
 /**
- * versal_get_sys_suspend_power_state() - Get power state for system suspend.
- * @req_state: Requested state.
+ * versal_get_sys_suspend_power_state() -  Get power state for system suspend
  *
+ * @req_state	Requested state
  */
 static void versal_get_sys_suspend_power_state(psci_power_state_t *req_state)
 {

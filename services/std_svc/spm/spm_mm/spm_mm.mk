@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2017-2023, ARM Limited and Contributors. All rights reserved.
+# Copyright (c) 2017-2022, ARM Limited and Contributors. All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
 #
@@ -10,10 +10,10 @@ endif
 ifneq (${ARCH},aarch64)
         $(error "Error: SPM_MM is only supported on aarch64.")
 endif
-ifneq (${ENABLE_SVE_FOR_NS},0)
+ifeq (${ENABLE_SVE_FOR_NS},1)
         $(error "Error: SPM_MM is not compatible with ENABLE_SVE_FOR_NS")
 endif
-ifneq (${ENABLE_SME_FOR_NS},0)
+ifeq (${ENABLE_SME_FOR_NS},1)
         $(error "Error: SPM_MM is not compatible with ENABLE_SME_FOR_NS")
 endif
 ifeq (${CTX_INCLUDE_FPREGS},0)
@@ -21,6 +21,7 @@ ifeq (${CTX_INCLUDE_FPREGS},0)
 endif
 
 SPM_MM_SOURCES	:=	$(addprefix services/std_svc/spm/spm_mm/,	\
+			${ARCH}/spm_mm_shim_exceptions.S		\
 			spm_mm_main.c					\
 			spm_mm_setup.c					\
 			spm_mm_xlat.c)

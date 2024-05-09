@@ -235,9 +235,7 @@ static void enable_hslv_by_index(uint32_t index)
 	}
 
 	if (apply_hslv) {
-		uint32_t reg_offset = index * sizeof(uint32_t);
-
-		mmio_write_32(SYSCFG_BASE + SYSCFG_HSLVEN0R + reg_offset, HSLV_KEY);
+		mmio_write_32(SYSCFG_BASE + SYSCFG_HSLVEN0R + index * sizeof(uint32_t), HSLV_KEY);
 	}
 }
 #endif

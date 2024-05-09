@@ -71,7 +71,7 @@ int32_t plat_sip_handler(uint32_t smc_fid,
 
 		break;
 
-#if ENABLE_FEAT_RAS
+#if RAS_EXTENSION
 	case TEGRA_SIP_CLEAR_RAS_CORRECTED_ERRORS:
 	{
 		/*

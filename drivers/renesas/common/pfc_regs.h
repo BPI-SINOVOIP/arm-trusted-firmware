@@ -146,10 +146,10 @@
 #define GPIO_OUTDTL7		(GPIO_BASE + 0x5848U)
 #define GPIO_BOTHEDGE7		(GPIO_BASE + 0x584CU)
 
-/* Pin function base address */
+/* Pin functon base address */
 #define PFC_BASE		(0xE6060000U)
 
-/* Pin function registers */
+/* Pin functon registers */
 #define PFC_PMMR		(PFC_BASE + 0x0000U)
 #define PFC_GPSR0		(PFC_BASE + 0x0100U)
 #define PFC_GPSR1		(PFC_BASE + 0x0104U)

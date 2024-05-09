@@ -1,13 +1,10 @@
 #
-# Copyright (c) 2019-2023, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
 #
 
 include common/fdt_wrappers.mk
-
-ARM_ARCH_MAJOR := 8
-ARM_ARCH_MINOR := 2
 
 # platform configs
 ENABLE_CONSOLE_SPE			:= 1
@@ -36,8 +33,8 @@ MAX_MMAP_REGIONS			:= 30
 $(eval $(call add_define,MAX_MMAP_REGIONS))
 
 # enable RAS handling
-HANDLE_EA_EL3_FIRST_NS			:= 1
-ENABLE_FEAT_RAS				:= 1
+HANDLE_EA_EL3_FIRST			:= 1
+RAS_EXTENSION				:= 1
 
 # platform files
 PLAT_INCLUDES		+=	-Iplat/nvidia/tegra/include/t194 \
@@ -71,7 +68,7 @@ BL31_SOURCES		+=	${TEGRA_DRIVERS}/spe/shared_console.S
 endif
 
 # RAS sources
-ifeq (${ENABLE_FEAT_RAS}-${HANDLE_EA_EL3_FIRST_NS},1-1)
+ifeq (${RAS_EXTENSION},1)
 BL31_SOURCES		+=	lib/extensions/ras/std_err_record.c		\
 				lib/extensions/ras/ras_common.c			\
 				${SOC_DIR}/plat_ras.c

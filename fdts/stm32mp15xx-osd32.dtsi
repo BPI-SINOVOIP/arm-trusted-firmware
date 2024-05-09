@@ -181,6 +181,7 @@
 
 /* CLOCK init */
 &rcc {
+	secure-status = "disabled";
 	st,clksrc = <
 		CLK_MPU_PLL1P
 		CLK_AXI_PLL2P

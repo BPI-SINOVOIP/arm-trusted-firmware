@@ -12,13 +12,15 @@
 #ifndef PLAT_PM_COMMON_H
 #define PLAT_PM_COMMON_H
 
-#include <stdint.h>
-
 #include <common/debug.h>
-
+#include <stdint.h>
 #include "pm_defs.h"
 
 #define NON_SECURE_FLAG		1U
 #define SECURE_FLAG		0U
 
+#define VERSAL_TZ_VERSION_MAJOR		1U
+#define VERSAL_TZ_VERSION_MINOR		0U
+#define VERSAL_TZ_VERSION		((VERSAL_TZ_VERSION_MAJOR << 16U) | \
+					VERSAL_TZ_VERSION_MINOR)
 #endif /* PLAT_PM_COMMON_H */

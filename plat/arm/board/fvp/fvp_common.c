@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2023, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2013-2022, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -12,19 +12,19 @@
 #include <drivers/arm/gicv2.h>
 #include <drivers/arm/sp804_delay_timer.h>
 #include <drivers/generic_delay_timer.h>
-#include <fconf_hw_config_getter.h>
 #include <lib/mmio.h>
 #include <lib/smccc.h>
 #include <lib/xlat_tables/xlat_tables_compat.h>
 #include <platform_def.h>
 #include <services/arm_arch_svc.h>
+#if ENABLE_RME
 #include <services/rmm_core_manifest.h>
+#endif
 #if SPM_MM
 #include <services/spm_mm_partition.h>
 #endif
 
 #include <plat/arm/common/arm_config.h>
-#include <plat/arm/common/arm_pas_def.h>
 #include <plat/arm/common/plat_arm.h>
 #include <plat/common/platform.h>
 
@@ -71,14 +71,6 @@ arm_config_t arm_config;
 					DEVICE2_SIZE,			\
 					MT_DEVICE | MT_RW | MT_SECURE)
 
-#if TRANSFER_LIST
-#ifdef FW_NS_HANDOFF_BASE
-#define MAP_FW_NS_HANDOFF MAP_REGION_FLAT(FW_NS_HANDOFF_BASE, \
-					  FW_HANDOFF_SIZE,    \
-					  MT_MEMORY | MT_RW | MT_NS)
-#endif
-#endif
-
 /*
  * Table of memory regions for various BL stages to map using the MMU.
  * This doesn't include Trusted SRAM as setup_page_tables() already takes care
@@ -119,15 +111,6 @@ const mmap_region_t plat_arm_mmap[] = {
 	 * Required to load HW_CONFIG, SPMC and SPs to trusted DRAM.
 	 */
 	ARM_MAP_TRUSTED_DRAM,
-
-	/*
-	 * Required to load Event Log in TZC secured memory
-	 */
-#if MEASURED_BOOT && (defined(SPD_tspd) || defined(SPD_opteed) || \
-defined(SPD_spmd))
-	ARM_MAP_EVENT_LOG_DRAM1,
-#endif /* MEASURED_BOOT && (SPD_tspd || SPD_opteed || SPD_spmd) */
-
 #if ENABLE_RME
 	ARM_MAP_RMM_DRAM,
 	ARM_MAP_GPT_L1_DRAM,
@@ -140,13 +123,13 @@ defined(SPD_spmd))
 	MAP_DEVICE2,
 #endif /* TRUSTED_BOARD_BOOT */
 
-#if CRYPTO_SUPPORT && !RESET_TO_BL2
+#if CRYPTO_SUPPORT && !BL2_AT_EL3
 	/*
 	 * To access shared the Mbed TLS heap while booting the
 	 * system with Crypto support
 	 */
 	ARM_MAP_BL1_RW,
-#endif /* CRYPTO_SUPPORT && !RESET_TO_BL2 */
+#endif /* CRYPTO_SUPPORT && !BL2_AT_EL3 */
 #if SPM_MM || SPMC_AT_EL3
 	ARM_SP_IMAGE_MMAP,
 #endif
@@ -191,17 +174,14 @@ const mmap_region_t plat_arm_mmap[] = {
 	ARM_MAP_GPT_L1_DRAM,
 	ARM_MAP_EL3_RMM_SHARED_MEM,
 #endif
-#ifdef MAP_FW_NS_HANDOFF
-	MAP_FW_NS_HANDOFF,
-#endif
 	{0}
 };
 
 #if defined(IMAGE_BL31) && SPM_MM
 const mmap_region_t plat_arm_secure_partition_mmap[] = {
 	V2M_MAP_IOFPGA_EL0, /* for the UART */
-	MAP_REGION_FLAT(DEVICE0_BASE,
-			DEVICE0_SIZE,
+	MAP_REGION_FLAT(DEVICE0_BASE,				\
+			DEVICE0_SIZE,				\
 			MT_DEVICE | MT_RO | MT_SECURE | MT_USER),
 	ARM_SP_IMAGE_MMAP,
 	ARM_SP_IMAGE_NS_BUF_MMAP,
@@ -551,73 +531,14 @@ size_t plat_rmmd_get_el3_rmm_shared_mem(uintptr_t *shared)
 	return (size_t)RMM_SHARED_SIZE;
 }
 
-int plat_rmmd_load_manifest(struct rmm_manifest *manifest)
+int plat_rmmd_load_manifest(rmm_manifest_t *manifest)
 {
-	uint64_t checksum, num_banks;
-	struct ns_dram_bank *bank_ptr;
-
 	assert(manifest != NULL);
 
-	/* Get number of DRAM banks */
-	num_banks = FCONF_GET_PROPERTY(hw_config, dram_layout, num_banks);
-	assert(num_banks <= ARM_DRAM_NUM_BANKS);
-
 	manifest->version = RMMD_MANIFEST_VERSION;
-	manifest->padding = 0U; /* RES0 */
 	manifest->plat_data = (uintptr_t)NULL;
-	manifest->plat_dram.num_banks = num_banks;
-
-	/*
-	 * Array ns_dram_banks[] follows ns_dram_info structure:
-	 *
-	 * +-----------------------------------+
-	 * |  offset  |   field   |  comment   |
-	 * +----------+-----------+------------+
-	 * |    0     |  version  | 0x00000002 |
-	 * +----------+-----------+------------+
-	 * |    4     |  padding  | 0x00000000 |
-	 * +----------+-----------+------------+
-	 * |    8     | plat_data |    NULL    |
-	 * +----------+-----------+------------+
-	 * |    16    | num_banks |            |
-	 * +----------+-----------+            |
-	 * |    24    |   banks   | plat_dram  |
-	 * +----------+-----------+            |
-	 * |    32    | checksum  |            |
-	 * +----------+-----------+------------+
-	 * |    40    |  base 0   |            |
-	 * +----------+-----------+   bank[0]  |
-	 * |    48    |  size 0   |            |
-	 * +----------+-----------+------------+
-	 * |    56    |  base 1   |            |
-	 * +----------+-----------+   bank[1]  |
-	 * |    64    |  size 1   |            |
-	 * +----------+-----------+------------+
-	 */
-	bank_ptr = (struct ns_dram_bank *)
-			((uintptr_t)&manifest->plat_dram.checksum +
-			sizeof(manifest->plat_dram.checksum));
-
-	manifest->plat_dram.banks = bank_ptr;
-
-	/* Calculate checksum of plat_dram structure */
-	checksum = num_banks + (uint64_t)bank_ptr;
-
-	/* Store FVP DRAM banks data in Boot Manifest */
-	for (unsigned long i = 0UL; i < num_banks; i++) {
-		uintptr_t base = FCONF_GET_PROPERTY(hw_config, dram_layout, dram_bank[i].base);
-		uint64_t size = FCONF_GET_PROPERTY(hw_config, dram_layout, dram_bank[i].size);
-
-		bank_ptr[i].base = base;
-		bank_ptr[i].size = size;
-
-		/* Update checksum */
-		checksum += base + size;
-	}
-
-	/* Checksum must be 0 */
-	manifest->plat_dram.checksum = ~checksum + 1UL;
 
 	return 0;
 }
-#endif	/* ENABLE_RME */
+
+#endif

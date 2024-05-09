@@ -4,8 +4,6 @@
 # SPDX-License-Identifier: BSD-3-Clause
 #
 
-$(warning Platform ${PLAT} is deprecated. Some of the features might not work as expected)
-
 # GIC-600 configuration
 GICV3_IMPL_GIC600_MULTICHIP	:=	1
 
@@ -73,6 +71,3 @@ ifneq ($(CSS_SGI_PLATFORM_VARIANT),0)
 endif
 
 override CTX_INCLUDE_AARCH32_REGS	:= 0
-
-# Enable the flag since RD-N1-EDGE has a system level cache
-NEOVERSE_Nx_EXTERNAL_LLC		:=	1

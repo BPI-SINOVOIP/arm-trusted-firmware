@@ -84,7 +84,7 @@
 #define TEGRA_CLK_SE			TEGRA186_CLK_SE
 
 /*******************************************************************************
- * Tegra Miscellaneous register constants
+ * Tegra Miscellanous register constants
  ******************************************************************************/
 #define TEGRA_MISC_BASE			U(0x00100000)
 #define  HARDWARE_REVISION_OFFSET	U(0x4)

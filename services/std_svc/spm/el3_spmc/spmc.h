@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2022, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -9,7 +9,6 @@
 
 #include <stdint.h>
 
-#include <common/bl_common.h>
 #include <lib/psci/psci.h>
 #include <lib/spinlock.h>
 #include <services/el3_spmc_logical_sp.h>
@@ -131,9 +130,6 @@ struct sp_exec_ctx {
 
 	/* Track the current runtime model of the SP. */
 	enum sp_runtime_model rt_model;
-
-	/* Track the source partition ID to validate a direct response. */
-	uint16_t dir_req_origin_id;
 };
 
 /*
@@ -167,12 +163,6 @@ struct secure_partition_desc {
 
 	/* Mailbox tracking. */
 	struct mailbox mailbox;
-
-	/* Lock to protect the runtime state of a S-EL0 SP execution context. */
-	spinlock_t rt_state_lock;
-
-	/* Pointer to translation table context of a S-EL0 SP. */
-	xlat_ctx_t *xlat_ctx_handle;
 
 	/* Secondary entrypoint. Only valid for a S-EL1 SP. */
 	uintptr_t secondary_ep;
@@ -219,6 +209,24 @@ struct ns_endpoint_desc {
 	uint32_t ffa_version;
 };
 
+/**
+ * Holds information returned for each partition by the FFA_PARTITION_INFO_GET
+ * interface.
+ */
+struct ffa_partition_info_v1_0 {
+	uint16_t ep_id;
+	uint16_t execution_ctx_count;
+	uint32_t properties;
+};
+
+/* Extended structure for v1.1. */
+struct ffa_partition_info_v1_1 {
+	uint16_t ep_id;
+	uint16_t execution_ctx_count;
+	uint32_t properties;
+	uint32_t uuid[4];
+};
+
 /* Reference to power management hooks */
 extern const spd_pm_ops_t spmc_pm;
 
@@ -230,10 +238,6 @@ void spmc_el1_sp_setup(struct secure_partition_desc *sp,
 		       entry_point_info_t *ep_info);
 void spmc_sp_common_ep_commit(struct secure_partition_desc *sp,
 			      entry_point_info_t *ep_info);
-void spmc_el0_sp_spsr_setup(entry_point_info_t *ep_info);
-void spmc_el0_sp_setup(struct secure_partition_desc *sp,
-		       int32_t boot_info_reg,
-		       void *sp_manifest);
 
 /*
  * Helper function to perform a synchronous entry into a SP.

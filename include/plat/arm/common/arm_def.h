@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2023, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015-2022, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -20,7 +20,7 @@
  *****************************************************************************/
 
 /*
- * Root of trust key lengths
+ * Root of trust key hash lengths
  */
 #define ARM_ROTPK_HEADER_LEN		19
 #define ARM_ROTPK_HASH_LEN		32
@@ -80,7 +80,6 @@
  *   - L1 GPT DRAM: Reserved for L1 GPT if RME is enabled
  *   - REALM DRAM: Reserved for Realm world if RME is enabled
  *   - TF-A <-> RMM SHARED: Area shared for communication between TF-A and RMM
- *   - Event Log: Area for Event Log if MEASURED_BOOT feature is enabled
  *   - AP TZC DRAM: The remaining TZC secured DRAM reserved for AP use
  *
  *              RME enabled(64MB)                RME not enabled(16MB)
@@ -88,15 +87,13 @@
  *              |                  |             |                 |
  *              |  AP TZC (~28MB)  |             |  AP TZC (~14MB) |
  *              --------------------             -------------------
- *              |     Event Log    |             |     Event Log   |
- *              |      (4KB)       |             |      (4KB)      |
- *              --------------------             -------------------
- *              |   REALM (RMM)    |             |                 |
- *              |   (32MB - 4KB)   |             |  EL3 TZC (2MB)  |
- *              --------------------             -------------------
  *              |                  |             |                 |
- *              |   TF-A <-> RMM   |             |    SCP TZC      |
- *              |   SHARED (4KB)   |  0xFFFF_FFFF-------------------
+ *              |   REALM (RMM)    |             |  EL3 TZC (2MB)  |
+ *              |   (32MB - 4KB)   |             -------------------
+ *              --------------------             |                 |
+ *              |                  |             |    SCP TZC      |
+ *              |   TF-A <-> RMM   |  0xFFFF_FFFF-------------------
+ *              |   SHARED (4KB)   |
  *              --------------------
  *              |                  |
  *              |  EL3 TZC (3MB)   |
@@ -110,11 +107,12 @@
 /*
  * Define a region within the TZC secured DRAM for use by EL3 runtime
  * firmware. This region is meant to be NOLOAD and will not be zero
- * initialized. Data sections with the attribute `.arm_el3_tzc_dram` will be
+ * initialized. Data sections with the attribute `arm_el3_tzc_dram` will be
  * placed here. 3MB region is reserved if RME is enabled, 2MB otherwise.
  */
 #define ARM_EL3_TZC_DRAM1_SIZE		UL(0x00300000) /* 3MB */
 #define ARM_L1_GPT_SIZE			UL(0x00100000) /* 1MB */
+
 /* 32MB - ARM_EL3_RMM_SHARED_SIZE */
 #define ARM_REALM_SIZE			(UL(0x02000000) -		\
 						ARM_EL3_RMM_SHARED_SIZE)
@@ -134,25 +132,6 @@
 #define ARM_SCP_TZC_DRAM1_SIZE		PLAT_ARM_SCP_TZC_DRAM1_SIZE
 #define ARM_SCP_TZC_DRAM1_END		(ARM_SCP_TZC_DRAM1_BASE +	\
 					ARM_SCP_TZC_DRAM1_SIZE - 1U)
-
-# if (defined(SPD_tspd) || defined(SPD_opteed) || defined(SPD_spmd)) && \
-MEASURED_BOOT
-#define ARM_EVENT_LOG_DRAM1_SIZE	UL(0x00001000)	/* 4KB */
-
-#if ENABLE_RME
-#define ARM_EVENT_LOG_DRAM1_BASE	(ARM_REALM_BASE -		\
-					 ARM_EVENT_LOG_DRAM1_SIZE)
-#else
-#define ARM_EVENT_LOG_DRAM1_BASE	(ARM_EL3_TZC_DRAM1_BASE -	\
-					 ARM_EVENT_LOG_DRAM1_SIZE)
-#endif /* ENABLE_RME */
-#define ARM_EVENT_LOG_DRAM1_END		(ARM_EVENT_LOG_DRAM1_BASE +	\
-					 ARM_EVENT_LOG_DRAM1_SIZE -	\
-					 1U)
-#else
-#define ARM_EVENT_LOG_DRAM1_SIZE	UL(0)
-#endif /* (SPD_tspd || SPD_opteed || SPD_spmd) && MEASURED_BOOT */
-
 #if ENABLE_RME
 #define ARM_L1_GPT_ADDR_BASE		(ARM_DRAM1_BASE +		\
 					ARM_DRAM1_SIZE -		\
@@ -189,14 +168,21 @@ MEASURED_BOOT
 					ARM_EL3_TZC_DRAM1_SIZE +	\
 					ARM_EL3_RMM_SHARED_SIZE +	\
 					ARM_REALM_SIZE +		\
-					ARM_L1_GPT_SIZE +		\
-					ARM_EVENT_LOG_DRAM1_SIZE))
-
+					ARM_L1_GPT_SIZE))
 #define ARM_AP_TZC_DRAM1_END		(ARM_AP_TZC_DRAM1_BASE +	\
 					ARM_AP_TZC_DRAM1_SIZE - 1U)
 
 /* Define the Access permissions for Secure peripherals to NS_DRAM */
+#if ARM_CRYPTOCELL_INTEG
+/*
+ * Allow Secure peripheral to read NS DRAM when integrated with CryptoCell.
+ * This is required by CryptoCell to authenticate BL33 which is loaded
+ * into the Non Secure DDR.
+ */
+#define ARM_TZC_NS_DRAM_S_ACCESS	TZC_REGION_S_RD
+#else
 #define ARM_TZC_NS_DRAM_S_ACCESS	TZC_REGION_S_NONE
+#endif
 
 #ifdef SPD_opteed
 /*
@@ -247,8 +233,6 @@ MEASURED_BOOT
 #define ARM_DRAM2_SIZE			PLAT_ARM_DRAM2_SIZE
 #define ARM_DRAM2_END			(ARM_DRAM2_BASE +		\
 					 ARM_DRAM2_SIZE - 1U)
-/* Number of DRAM banks */
-#define ARM_DRAM_NUM_BANKS		2UL
 
 #define ARM_IRQ_SEC_PHY_TIMER		29
 
@@ -324,15 +308,6 @@ MEASURED_BOOT
 					PLAT_ARM_TRUSTED_DRAM_BASE,	\
 					PLAT_ARM_TRUSTED_DRAM_SIZE,	\
 					MT_MEMORY | MT_RW | MT_SECURE)
-
-# if (defined(SPD_tspd) || defined(SPD_opteed) || defined(SPD_spmd)) && \
-MEASURED_BOOT
-#define ARM_MAP_EVENT_LOG_DRAM1						\
-				MAP_REGION_FLAT(			\
-					ARM_EVENT_LOG_DRAM1_BASE,	\
-					ARM_EVENT_LOG_DRAM1_SIZE,	\
-					MT_MEMORY | MT_RW | MT_SECURE)
-#endif /* (SPD_tspd || SPD_opteed || SPD_spmd) && MEASURED_BOOT */
 
 #if ENABLE_RME
 /*
@@ -528,8 +503,7 @@ MEASURED_BOOT
  * Define limit of firmware configuration memory:
  * ARM_FW_CONFIG + ARM_BL2_MEM_DESC memory
  */
-#define ARM_FW_CONFIGS_SIZE		(PAGE_SIZE * 2)
-#define ARM_FW_CONFIGS_LIMIT		(ARM_BL_RAM_BASE + ARM_FW_CONFIGS_SIZE)
+#define ARM_FW_CONFIGS_LIMIT		(ARM_BL_RAM_BASE + (PAGE_SIZE * 2))
 
 #if ENABLE_RME
 /*
@@ -576,21 +550,21 @@ MEASURED_BOOT
 /*******************************************************************************
  * BL2 specific defines.
  ******************************************************************************/
-#if RESET_TO_BL2
+#if BL2_AT_EL3
 #if ENABLE_PIE
 /*
  * As the BL31 image size appears to be increased when built with the ENABLE_PIE
  * option, set BL2 base address to have enough space for BL31 in Trusted SRAM.
  */
-#define BL2_OFFSET			(0x5000)
+#define BL2_BASE			(ARM_TRUSTED_SRAM_BASE + \
+					(PLAT_ARM_TRUSTED_SRAM_SIZE >> 1) + \
+					0x3000)
 #else
 /* Put BL2 towards the middle of the Trusted SRAM */
-#define BL2_OFFSET			(0x2000)
-#endif /* ENABLE_PIE */
-
 #define BL2_BASE			(ARM_TRUSTED_SRAM_BASE + \
-					    (PLAT_ARM_TRUSTED_SRAM_SIZE >> 1) + \
-					    BL2_OFFSET)
+					(PLAT_ARM_TRUSTED_SRAM_SIZE >> 1) + \
+					0x2000)
+#endif /* ENABLE_PIE */
 #define BL2_LIMIT			(ARM_BL_RAM_BASE + ARM_BL_RAM_SIZE)
 
 #else
@@ -636,11 +610,10 @@ MEASURED_BOOT
 						- PLAT_ARM_MAX_BL31_SIZE)
 #define BL31_PROGBITS_LIMIT		BL2_BASE
 /*
- * For RESET_TO_BL2 make sure the BL31 can grow up until BL2_BASE.
- * This is because in the RESET_TO_BL2 configuration,
- * BL2 is always resident.
+ * For BL2_AT_EL3 make sure the BL31 can grow up until BL2_BASE. This is
+ * because in the BL2_AT_EL3 configuration, BL2 is always resident.
  */
-#if RESET_TO_BL2
+#if BL2_AT_EL3
 #define BL31_LIMIT			BL2_BASE
 #else
 #define BL31_LIMIT			(ARM_BL_RAM_BASE + ARM_BL_RAM_SIZE)
@@ -721,7 +694,7 @@ MEASURED_BOOT
 #  define TSP_SEC_MEM_SIZE		PLAT_ARM_TRUSTED_DRAM_SIZE
 #  define BL32_BASE			PLAT_ARM_TRUSTED_DRAM_BASE
 #  define BL32_LIMIT			(PLAT_ARM_TRUSTED_DRAM_BASE	\
-						+ SZ_4M)
+						+ (UL(1) << 21))
 # elif ARM_TSP_RAM_LOCATION_ID == ARM_DRAM_ID
 #  define TSP_SEC_MEM_BASE		ARM_AP_TZC_DRAM1_BASE
 #  define TSP_SEC_MEM_SIZE		ARM_AP_TZC_DRAM1_SIZE
@@ -765,14 +738,9 @@ MEASURED_BOOT
 #define PLAT_PERCPU_BAKERY_LOCK_SIZE		(1 * CACHE_WRITEBACK_GRANULE)
 
 /* Priority levels for ARM platforms */
-#if ENABLE_FEAT_RAS && FFH_SUPPORT
 #define PLAT_RAS_PRI			0x10
-#endif
 #define PLAT_SDEI_CRITICAL_PRI		0x60
 #define PLAT_SDEI_NORMAL_PRI		0x70
-
-/* CPU Fault Handling Interrupt(FHI) PPI interrupt ID */
-#define PLAT_CORE_FAULT_IRQ		17
 
 /* ARM platforms use 3 upper bits of secure interrupt priority */
 #define PLAT_PRI_BITS			3

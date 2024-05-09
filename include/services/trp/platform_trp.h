@@ -9,11 +9,9 @@
 
 #include <services/rmm_core_manifest.h>
 
-struct rmm_manifest;
-
 /*******************************************************************************
  * Mandatory TRP functions (only if platform contains a TRP)
  ******************************************************************************/
-void trp_early_platform_setup(struct rmm_manifest *manifest);
+void trp_early_platform_setup(rmm_manifest_t *manifest);
 
 #endif /* PLATFORM_TRP_H */

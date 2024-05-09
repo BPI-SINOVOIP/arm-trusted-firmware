@@ -2,7 +2,7 @@ Performing an Initial Build
 ===========================
 
 -  Before building TF-A, the environment variable ``CROSS_COMPILE`` must point
-   to your cross compiler.
+   to the Linaro cross compiler.
 
    For AArch64:
 

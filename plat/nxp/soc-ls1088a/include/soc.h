@@ -112,7 +112,7 @@
 #define IPSTPCR1_VALUE			0x000003FF
 #define IPSTPCR2_VALUE			0x00013006
 
-/* Don't stop UART */
+/* Dont' stop UART */
 #define IPSTPCR3_VALUE			0x0000033A
 
 #define IPSTPCR4_VALUE			0x00103300

@@ -10,15 +10,6 @@
 #include <lib/mmio.h>
 #include "socfpga_plat_def.h"
 
-
-#if PLATFORM_MODEL == PLAT_SOCFPGA_AGILEX
-#include "agilex_clock_manager.h"
-#elif PLATFORM_MODEL == PLAT_SOCFPGA_N5X
-#include "n5x_clock_manager.h"
-#elif PLATFORM_MODEL == PLAT_SOCFPGA_STRATIX10
-#include "s10_clock_manager.h"
-#endif
-
 #define SOCFPGA_GLOBAL_TIMER		0xffd01000
 #define SOCFPGA_GLOBAL_TIMER_EN		0x3
 

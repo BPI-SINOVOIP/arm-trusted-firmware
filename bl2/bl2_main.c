@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2023, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2013-2022, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -16,9 +16,7 @@
 #include <drivers/auth/crypto_mod.h>
 #include <drivers/console.h>
 #include <drivers/fwu/fwu.h>
-#include <lib/bootmarker_capture.h>
 #include <lib/extensions/pauth.h>
-#include <lib/pmf/pmf.h>
 #include <plat/common/platform.h>
 
 #include "bl2_private.h"
@@ -29,14 +27,9 @@
 #define NEXT_IMAGE	"BL32"
 #endif
 
-#if ENABLE_RUNTIME_INSTRUMENTATION
-	PMF_REGISTER_SERVICE(bl_svc, PMF_RT_INSTR_SVC_ID,
-		BL_TOTAL_IDS, PMF_DUMP_ENABLE);
-#endif
-
-#if RESET_TO_BL2
+#if BL2_AT_EL3
 /*******************************************************************************
- * Setup function for BL2 when RESET_TO_BL2=1
+ * Setup function for BL2 when BL2_AT_EL3=1
  ******************************************************************************/
 void bl2_el3_setup(u_register_t arg0, u_register_t arg1, u_register_t arg2,
 		   u_register_t arg3)
@@ -55,10 +48,9 @@ void bl2_el3_setup(u_register_t arg0, u_register_t arg1, u_register_t arg2,
 	assert(is_armv8_3_pauth_present());
 #endif /* CTX_INCLUDE_PAUTH_REGS */
 }
-#else /* RESET_TO_BL2 */
-
+#else /* BL2_AT_EL3 */
 /*******************************************************************************
- * Setup function for BL2 when RESET_TO_BL2=0
+ * Setup function for BL2 when BL2_AT_EL3=0
  ******************************************************************************/
 void bl2_setup(u_register_t arg0, u_register_t arg1, u_register_t arg2,
 	       u_register_t arg3)
@@ -77,7 +69,7 @@ void bl2_setup(u_register_t arg0, u_register_t arg1, u_register_t arg2,
 	assert(is_armv8_3_pauth_present());
 #endif /* CTX_INCLUDE_PAUTH_REGS */
 }
-#endif /* RESET_TO_BL2 */
+#endif /* BL2_AT_EL3 */
 
 /*******************************************************************************
  * The only thing to do in BL2 is to load further images and pass control to
@@ -87,10 +79,6 @@ void bl2_setup(u_register_t arg0, u_register_t arg1, u_register_t arg2,
 void bl2_main(void)
 {
 	entry_point_info_t *next_bl_ep_info;
-
-#if ENABLE_RUNTIME_INSTRUMENTATION
-	PMF_CAPTURE_TIMESTAMP(bl_svc, BL2_ENTRY, PMF_CACHE_MAINT);
-#endif
 
 	NOTICE("BL2: %s\n", version_string);
 	NOTICE("BL2: %s\n", build_message);
@@ -119,7 +107,7 @@ void bl2_main(void)
 	/* Teardown the Measured Boot backend */
 	bl2_plat_mboot_finish();
 
-#if !BL2_RUNS_AT_EL3
+#if !BL2_AT_EL3 && !ENABLE_RME
 #ifndef __aarch64__
 	/*
 	 * For AArch32 state BL1 and BL2 share the MMU setup.
@@ -129,6 +117,8 @@ void bl2_main(void)
 	disable_mmu_icache_secure();
 #endif /* !__aarch64__ */
 
+	console_flush();
+
 #if ENABLE_PAUTH
 	/*
 	 * Disable pointer authentication before running next boot image
@@ -136,25 +126,15 @@ void bl2_main(void)
 	pauth_disable_el1();
 #endif /* ENABLE_PAUTH */
 
-#if ENABLE_RUNTIME_INSTRUMENTATION
-	PMF_CAPTURE_TIMESTAMP(bl_svc, BL2_EXIT, PMF_CACHE_MAINT);
-#endif
-
-	console_flush();
-
 	/*
 	 * Run next BL image via an SMC to BL1. Information on how to pass
 	 * control to the BL32 (if present) and BL33 software images will
 	 * be passed to next BL image as an argument.
 	 */
 	smc(BL1_SMC_RUN_IMAGE, (unsigned long)next_bl_ep_info, 0, 0, 0, 0, 0, 0);
-#else /* if BL2_RUNS_AT_EL3 */
-
+#else /* if BL2_AT_EL3 || ENABLE_RME */
 	NOTICE("BL2: Booting " NEXT_IMAGE "\n");
 	print_entry_point_info(next_bl_ep_info);
-#if ENABLE_RUNTIME_INSTRUMENTATION
-	PMF_CAPTURE_TIMESTAMP(bl_svc, BL2_EXIT, PMF_CACHE_MAINT);
-#endif
 	console_flush();
 
 #if ENABLE_PAUTH
@@ -165,5 +145,5 @@ void bl2_main(void)
 #endif /* ENABLE_PAUTH */
 
 	bl2_run_next_image(next_bl_ep_info);
-#endif /* BL2_RUNS_AT_EL3 */
+#endif /* BL2_AT_EL3 && ENABLE_RME */
 }

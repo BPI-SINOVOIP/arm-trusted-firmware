@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2023, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2020-2021, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -8,8 +8,6 @@
 #include <drivers/arm/gic600_multichip.h>
 #include <plat/arm/common/plat_arm.h>
 #include <plat/common/platform.h>
-#include <services/el3_spmc_ffa_memory.h>
-#include <rdn2_ras.h>
 #include <sgi_soc_platform_def_v2.h>
 #include <sgi_plat.h>
 
@@ -49,15 +47,15 @@ static struct gic600_multichip_data rdn2mc_multichip_data __init = {
 #endif
 	},
 	.spi_ids = {
-		{PLAT_ARM_GICD_BASE, 32, 511},
+		{32, 479},
 	#if CSS_SGI_CHIP_COUNT > 1
-		{PLAT_ARM_GICD_BASE, 512, 991},
+		{0, 0},
 	#endif
 	#if CSS_SGI_CHIP_COUNT > 2
-		{PLAT_ARM_GICD_BASE, 4096, 4575},
+		{0, 0},
 	#endif
 	#if CSS_SGI_CHIP_COUNT > 3
-		{PLAT_ARM_GICD_BASE, 4576, 5055},
+		{0, 0},
 	#endif
 	}
 };
@@ -136,47 +134,5 @@ void bl31_platform_setup(void)
 #endif
 
 	sgi_bl31_common_platform_setup();
-
-#if ENABLE_FEAT_RAS && FFH_SUPPORT
-	sgi_ras_platform_setup(&ras_config);
-#endif
 }
 #endif /* IMAGE_BL31 */
-
-#if SPMC_AT_EL3
-
-#define DATASTORE_SIZE 1024
-
-__section("arm_el3_tzc_dram") uint8_t plat_spmc_shmem_datastore[DATASTORE_SIZE];
-
-int plat_spmc_shmem_datastore_get(uint8_t **datastore, size_t *size)
-{
-	*datastore = plat_spmc_shmem_datastore;
-	*size = DATASTORE_SIZE;
-	return 0;
-}
-
-/*
- * Add dummy implementations of memory management related platform hooks.
- * Memory share/lend operation are not required on RdN2 platform.
- */
-int plat_spmc_shmem_begin(struct ffa_mtd *desc)
-{
-	return 0;
-}
-
-int plat_spmc_shmem_reclaim(struct ffa_mtd *desc)
-{
-	return 0;
-}
-
-int plat_spmd_handle_group0_interrupt(uint32_t intid)
-{
-	/*
-	 * As of now, there are no sources of Group0 secure interrupt enabled
-	 * for RDN2.
-	 */
-	(void)intid;
-	return -1;
-}
-#endif

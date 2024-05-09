@@ -1,18 +1,16 @@
 /*
- * Copyright (c) 2018-2019, Arm Limited and Contributors. All rights reserved.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (c) 2018-2019, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
+
+#include <plat_private.h>
+#include <platform_def.h>
 
 #include <common/interrupt_props.h>
 #include <drivers/arm/gicv3.h>
 #include <lib/utils.h>
 #include <plat/common/platform.h>
-
-#include <plat_private.h>
-#include <platform_def.h>
-
 
 /******************************************************************************
  * The following functions are defined as weak to allow a platform to override
@@ -38,8 +36,8 @@ static const interrupt_prop_t versal_interrupt_props[] = {
  * We save and restore the GICv3 context on system suspend. Allocate the
  * data in the designated EL3 Secure carve-out memory.
  */
-static gicv3_redist_ctx_t rdist_ctx __section(".versal_el3_tzc_dram");
-static gicv3_dist_ctx_t dist_ctx __section(".versal_el3_tzc_dram");
+static gicv3_redist_ctx_t rdist_ctx __section("versal_el3_tzc_dram");
+static gicv3_dist_ctx_t dist_ctx __section("versal_el3_tzc_dram");
 
 /*
  * MPIDR hashing function for translating MPIDRs read from GICR_TYPER register
@@ -62,8 +60,8 @@ static uint32_t versal_gicv3_mpidr_hash(u_register_t mpidr)
 }
 
 static const gicv3_driver_data_t versal_gic_data __unused = {
-	.gicd_base = PLAT_GICD_BASE_VALUE,
-	.gicr_base = PLAT_GICR_BASE_VALUE,
+	.gicd_base = PLAT_VERSAL_GICD_BASE,
+	.gicr_base = PLAT_VERSAL_GICR_BASE,
 	.interrupt_props = versal_interrupt_props,
 	.interrupt_props_num = ARRAY_SIZE(versal_interrupt_props),
 	.rdistif_num = PLATFORM_CORE_COUNT,

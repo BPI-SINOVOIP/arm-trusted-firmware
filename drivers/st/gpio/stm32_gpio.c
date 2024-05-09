@@ -234,27 +234,27 @@ static void set_gpio(uint32_t bank, uint32_t pin, uint32_t mode, uint32_t type,
 	clk_enable(clock);
 
 	mmio_clrsetbits_32(base + GPIO_MODE_OFFSET,
-			   (uint32_t)GPIO_MODE_MASK << (pin << 1U),
-			   mode << (pin << 1U));
+			   (uint32_t)GPIO_MODE_MASK << (pin << 1),
+			   mode << (pin << 1));
 
 	mmio_clrsetbits_32(base + GPIO_TYPE_OFFSET,
 			   (uint32_t)GPIO_TYPE_MASK << pin,
 			   type << pin);
 
 	mmio_clrsetbits_32(base + GPIO_SPEED_OFFSET,
-			   (uint32_t)GPIO_SPEED_MASK << (pin << 1U),
-			   speed << (pin << 1U));
+			   (uint32_t)GPIO_SPEED_MASK << (pin << 1),
+			   speed << (pin << 1));
 
 	mmio_clrsetbits_32(base + GPIO_PUPD_OFFSET,
-			   (uint32_t)GPIO_PULL_MASK << (pin << 1U),
-			   pull << (pin << 1U));
+			   (uint32_t)GPIO_PULL_MASK << (pin << 1),
+			   pull << (pin << 1));
 
 	if (pin < GPIO_ALT_LOWER_LIMIT) {
 		mmio_clrsetbits_32(base + GPIO_AFRL_OFFSET,
-				   (uint32_t)GPIO_ALTERNATE_MASK << (pin << 2U),
-				   alternate << (pin << 2U));
+				   (uint32_t)GPIO_ALTERNATE_MASK << (pin << 2),
+				   alternate << (pin << 2));
 	} else {
-		uint32_t shift = (pin - GPIO_ALT_LOWER_LIMIT) << 2U;
+		size_t shift = (pin - GPIO_ALT_LOWER_LIMIT) << 2;
 
 		mmio_clrsetbits_32(base + GPIO_AFRH_OFFSET,
 				   (uint32_t)GPIO_ALTERNATE_MASK << shift,

@@ -6,7 +6,6 @@ Marvell
    :caption: Contents
 
    armada/build
-   armada/uart-booting
    armada/porting
    armada/misc/mvebu-a8k-addr-map
    armada/misc/mvebu-amb

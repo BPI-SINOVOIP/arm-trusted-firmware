@@ -1,6 +1,5 @@
 /*
- * Copyright (c) 2013-2018, Arm Limited and Contributors. All rights reserved.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (c) 2013-2018, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -21,24 +20,26 @@
 #include <lib/utils.h>
 
 #include <plat_ipi.h>
+#include <zynqmp_def.h>
+#include "pm_api_sys.h"
 #include "pm_client.h"
 #include "pm_ipi.h"
-#include <zynqmp_def.h>
-#include "zynqmp_pm_api_sys.h"
 
-#define IRQ_MAX		84U
-#define NUM_GICD_ISENABLER	((IRQ_MAX >> 5U) + 1U)
-#define UNDEFINED_CPUID		(~0U)
+#define IRQ_MAX		84
+#define NUM_GICD_ISENABLER	((IRQ_MAX >> 5) + 1)
+#define UNDEFINED_CPUID		(~0)
 
-#define PM_SUSPEND_MODE_STD		0U
-#define PM_SUSPEND_MODE_POWER_OFF	1U
+#define PM_SUSPEND_MODE_STD		0
+#define PM_SUSPEND_MODE_POWER_OFF	1
 
 DEFINE_BAKERY_LOCK(pm_client_secure_lock);
 
-static const struct pm_ipi apu_ipi = {
-	.local_ipi_id = IPI_LOCAL_ID,
-	.remote_ipi_id = IPI_REMOTE_ID,
-	.buffer_base = IPI_BUFFER_LOCAL_BASE,
+extern const struct pm_ipi apu_ipi;
+
+const struct pm_ipi apu_ipi = {
+	.local_ipi_id = IPI_ID_APU,
+	.remote_ipi_id = IPI_ID_PMU0,
+	.buffer_base = IPI_BUFFER_APU_BASE,
 };
 
 static uint32_t suspend_mode = PM_SUSPEND_MODE_STD;
@@ -68,7 +69,7 @@ static const struct pm_proc pm_procs_all[] = {
 };
 
 /* Interrupt to PM node ID map */
-static enum pm_node_id irq_node_map[IRQ_MAX + 1U] = {
+static enum pm_node_id irq_node_map[IRQ_MAX + 1] = {
 	NODE_UNKNOWN,
 	NODE_UNKNOWN,
 	NODE_UNKNOWN,
@@ -157,11 +158,10 @@ static enum pm_node_id irq_node_map[IRQ_MAX + 1U] = {
 };
 
 /**
- * irq_to_pm_node - Get PM node ID corresponding to the interrupt number.
- * @irq: Interrupt number.
+ * irq_to_pm_node - Get PM node ID corresponding to the interrupt number
+ * @irq:	Interrupt number
  *
- * Return: PM node ID corresponding to the specified interrupt.
- *
+ * Return:	PM node ID corresponding to the specified interrupt
  */
 static enum pm_node_id irq_to_pm_node(uint32_t irq)
 {
@@ -171,20 +171,19 @@ static enum pm_node_id irq_to_pm_node(uint32_t irq)
 
 /**
  * pm_client_set_wakeup_sources - Set all slaves with enabled interrupts as wake
- *                                sources in the PMU firmware.
- *
+ *				sources in the PMU firmware
  */
 static void pm_client_set_wakeup_sources(void)
 {
 	uint32_t reg_num;
-	uint8_t pm_wakeup_nodes_set[NODE_MAX] = { 0 };
-	uintptr_t isenabler1 = BASE_GICD_BASE + GICD_ISENABLER + 4U;
+	uint8_t pm_wakeup_nodes_set[NODE_MAX];
+	uintptr_t isenabler1 = BASE_GICD_BASE + GICD_ISENABLER + 4;
 
 	/* In case of power-off suspend, only NODE_EXTERN must be set */
 	if (suspend_mode == PM_SUSPEND_MODE_POWER_OFF) {
 		enum pm_ret_status ret;
 
-		ret = pm_set_wakeup_source(NODE_APU, NODE_EXTERN, 1U);
+		ret = pm_set_wakeup_source(NODE_APU, NODE_EXTERN, 1);
 		/**
 		 * If NODE_EXTERN could not be set as wake source, proceed with
 		 * standard suspend (no one will wake the system otherwise)
@@ -196,11 +195,11 @@ static void pm_client_set_wakeup_sources(void)
 
 	zeromem(&pm_wakeup_nodes_set, sizeof(pm_wakeup_nodes_set));
 
-	for (reg_num = 0U; reg_num < NUM_GICD_ISENABLER; reg_num++) {
+	for (reg_num = 0; reg_num < NUM_GICD_ISENABLER; reg_num++) {
 		uint32_t base_irq = reg_num << ISENABLER_SHIFT;
-		uint32_t reg = mmio_read_32(isenabler1 + (reg_num << 2U));
+		uint32_t reg = mmio_read_32(isenabler1 + (reg_num << 2));
 
-		if (reg == 0) {
+		if (!reg) {
 			continue;
 		}
 
@@ -229,11 +228,10 @@ static void pm_client_set_wakeup_sources(void)
 }
 
 /**
- * pm_get_proc() - returns pointer to the proc structure.
- * @cpuid: id of the cpu whose proc struct pointer should be returned.
+ * pm_get_proc() - returns pointer to the proc structure
+ * @cpuid:	id of the cpu whose proc struct pointer should be returned
  *
- * Return: pointer to a proc structure if proc is found, otherwise NULL.
- *
+ * Return: pointer to a proc structure if proc is found, otherwise NULL
  */
 const struct pm_proc *pm_get_proc(uint32_t cpuid)
 {
@@ -245,11 +243,10 @@ const struct pm_proc *pm_get_proc(uint32_t cpuid)
 }
 
 /**
- * pm_get_proc_by_node() - returns pointer to the proc structure.
- * @nid: node id of the processor.
+ * pm_get_proc_by_node() - returns pointer to the proc structure
+ * @nid:	node id of the processor
  *
- * Return: pointer to a proc structure if proc is found, otherwise NULL.
- *
+ * Return: pointer to a proc structure if proc is found, otherwise NULL
  */
 const struct pm_proc *pm_get_proc_by_node(enum pm_node_id nid)
 {
@@ -262,11 +259,10 @@ const struct pm_proc *pm_get_proc_by_node(enum pm_node_id nid)
 }
 
 /**
- * pm_get_cpuid() - get the local cpu ID for a global node ID.
- * @nid: node id of the processor.
+ * pm_get_cpuid() - get the local cpu ID for a global node ID
+ * @nid:	node id of the processor
  *
- * Return: the cpu ID (starting from 0) for the subsystem.
- *
+ * Return: the cpu ID (starting from 0) for the subsystem
  */
 static uint32_t pm_get_cpuid(enum pm_node_id nid)
 {
@@ -281,14 +277,11 @@ static uint32_t pm_get_cpuid(enum pm_node_id nid)
 const struct pm_proc *primary_proc = &pm_procs_all[0];
 
 /**
- * pm_client_suspend() - Client-specific suspend actions.
- * @proc: processor which need to suspend.
- * @state: desired suspend state.
+ * pm_client_suspend() - Client-specific suspend actions
  *
  * This function should contain any PU-specific actions
  * required prior to sending suspend request to PMU
  * Actions taken depend on the state system is suspending to.
- *
  */
 void pm_client_suspend(const struct pm_proc *proc, uint32_t state)
 {
@@ -306,11 +299,10 @@ void pm_client_suspend(const struct pm_proc *proc, uint32_t state)
 
 
 /**
- * pm_client_abort_suspend() - Client-specific abort-suspend actions.
+ * pm_client_abort_suspend() - Client-specific abort-suspend actions
  *
  * This function should contain any PU-specific actions
- * required for aborting a prior suspend request.
- *
+ * required for aborting a prior suspend request
  */
 void pm_client_abort_suspend(void)
 {
@@ -327,12 +319,10 @@ void pm_client_abort_suspend(void)
 }
 
 /**
- * pm_client_wakeup() - Client-specific wakeup actions.
- * @proc: Processor which need to wakeup.
+ * pm_client_wakeup() - Client-specific wakeup actions
  *
  * This function should contain any PU-specific actions
- * required for waking up another APU core.
- *
+ * required for waking up another APU core
  */
 void pm_client_wakeup(const struct pm_proc *proc)
 {

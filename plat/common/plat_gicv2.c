@@ -1,6 +1,5 @@
 /*
- * Copyright (c) 2015-2023, Arm Limited and Contributors. All rights reserved.
- * Portions copyright (c) 2021-2022, ProvenRun S.A.S. All rights reserved.
+ * Copyright (c) 2015-2018, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -35,8 +34,6 @@
 #pragma weak plat_ic_set_interrupt_priority
 #pragma weak plat_ic_set_interrupt_type
 #pragma weak plat_ic_raise_el3_sgi
-#pragma weak plat_ic_raise_ns_sgi
-#pragma weak plat_ic_raise_s_el1_sgi
 #pragma weak plat_ic_set_spi_routing
 
 /*
@@ -193,9 +190,9 @@ void plat_ic_set_interrupt_priority(unsigned int id, unsigned int priority)
 	gicv2_set_interrupt_priority(id, priority);
 }
 
-bool plat_ic_has_interrupt_type(unsigned int type)
+int plat_ic_has_interrupt_type(unsigned int type)
 {
-	bool has_interrupt_type = false;
+	int has_interrupt_type = 0;
 
 	switch (type) {
 #if GICV2_G0_FOR_EL3
@@ -204,7 +201,7 @@ bool plat_ic_has_interrupt_type(unsigned int type)
 	case INTR_TYPE_S_EL1:
 #endif
 	case INTR_TYPE_NS:
-		has_interrupt_type = true;
+		has_interrupt_type = 1;
 		break;
 	default:
 		/* Do nothing in default case */
@@ -216,7 +213,7 @@ bool plat_ic_has_interrupt_type(unsigned int type)
 
 void plat_ic_set_interrupt_type(unsigned int id, unsigned int type)
 {
-	unsigned int gicv2_group = 0U;
+	unsigned int gicv2_type = 0U;
 
 	/* Map canonical interrupt type to GICv2 type */
 	switch (type) {
@@ -225,17 +222,17 @@ void plat_ic_set_interrupt_type(unsigned int id, unsigned int type)
 #else
 	case INTR_TYPE_S_EL1:
 #endif
-		gicv2_group = GICV2_INTR_GROUP0;
+		gicv2_type = GICV2_INTR_GROUP0;
 		break;
 	case INTR_TYPE_NS:
-		gicv2_group = GICV2_INTR_GROUP1;
+		gicv2_type = GICV2_INTR_GROUP1;
 		break;
 	default:
-		assert(false); /* Unreachable */
+		assert(0); /* Unreachable */
 		break;
 	}
 
-	gicv2_set_interrupt_group(id, gicv2_group);
+	gicv2_set_interrupt_type(id, gicv2_type);
 }
 
 void plat_ic_raise_el3_sgi(int sgi_num, u_register_t target)
@@ -250,41 +247,9 @@ void plat_ic_raise_el3_sgi(int sgi_num, u_register_t target)
 	/* Verify that this is a secure SGI */
 	assert(plat_ic_get_interrupt_type(sgi_num) == INTR_TYPE_EL3);
 
-	gicv2_raise_sgi(sgi_num, false, id);
+	gicv2_raise_sgi(sgi_num, id);
 #else
 	assert(false);
-#endif
-}
-
-void plat_ic_raise_ns_sgi(int sgi_num, u_register_t target)
-{
-	int id;
-
-	/* Target must be a valid MPIDR in the system */
-	id = plat_core_pos_by_mpidr(target);
-	assert(id >= 0);
-
-	/* Verify that this is a non-secure SGI */
-	assert(plat_ic_get_interrupt_type(sgi_num) == INTR_TYPE_NS);
-
-	gicv2_raise_sgi(sgi_num, true, id);
-}
-
-void plat_ic_raise_s_el1_sgi(int sgi_num, u_register_t target)
-{
-#if GICV2_G0_FOR_EL3
-	assert(false);
-#else
-	int id;
-
-	/* Target must be a valid MPIDR in the system */
-	id = plat_core_pos_by_mpidr(target);
-	assert(id >= 0);
-
-	/* Verify that this is a secure EL1 SGI */
-	assert(plat_ic_get_interrupt_type(sgi_num) == INTR_TYPE_S_EL1);
-
-	gicv2_raise_sgi(sgi_num, false, id);
 #endif
 }
 

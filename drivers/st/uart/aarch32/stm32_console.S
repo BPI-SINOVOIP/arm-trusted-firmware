@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2023, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2018-2022, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -46,16 +46,10 @@ func console_stm32_core_init
 	cmp	r0, #0
 	beq	core_init_fail
 #if !defined(IMAGE_BL2)
-#if STM32MP_RECONFIGURE_CONSOLE
-	/* UART clock rate is set to 0 in BL32, skip init in that case */
-	cmp	r1, #0
-	beq	1f
-#else /* STM32MP_RECONFIGURE_CONSOLE */
 	/* Skip UART initialization if it is already enabled */
 	ldr	r3, [r0, #USART_CR1]
 	ands	r3, r3, #USART_CR1_UE
 	bne	1f
-#endif /* STM32MP_RECONFIGURE_CONSOLE */
 #endif /* IMAGE_BL2 */
 	/* Check baud rate and uart clock for sanity */
 	cmp	r1, #0
@@ -234,16 +228,11 @@ func console_stm32_core_flush
 	cmp	r0, #0
 	ASM_ASSERT(ne)
 #endif /* ENABLE_ASSERTIONS */
-	/* Skip flush if UART is not enabled */
-	ldr	r1, [r0, #USART_CR1]
-	tst	r1, #USART_CR1_UE
-	beq	1f
 	/* Check Transmit Data Register Empty */
 txe_loop_3:
 	ldr	r1, [r0, #USART_ISR]
 	tst	r1, #USART_ISR_TXE
 	beq	txe_loop_3
-1:
 	bx	lr
 endfunc console_stm32_core_flush
 

@@ -14,6 +14,8 @@
 #include <drivers/auth/crypto_mod.h>
 #include <drivers/measured_boot/event_log/event_log.h>
 
+#include <plat/common/platform.h>
+
 #if TPM_ALG_ID == TPM_ALG_SHA512
 #define	CRYPTO_MD_ID	CRYPTO_MD_SHA512
 #elif TPM_ALG_ID == TPM_ALG_SHA384
@@ -29,6 +31,9 @@ static uint8_t *log_ptr;
 
 /* Pointer to the first byte past end of the Event Log buffer */
 static uintptr_t log_end;
+
+/* Pointer to event_log_metadata_t */
+static const event_log_metadata_t *plat_metadata_ptr;
 
 /* TCG_EfiSpecIdEvent */
 static const id_event_headers_t id_event_header = {
@@ -79,26 +84,23 @@ static const event2_header_t locality_event_header = {
  * Record a measurement as a TCG_PCR_EVENT2 event
  *
  * @param[in] hash		Pointer to hash data of TCG_DIGEST_SIZE bytes
- * @param[in] event_type	Type of Event, Various Event Types are
- * 				mentioned in tcg.h header
  * @param[in] metadata_ptr	Pointer to event_log_metadata_t structure
  *
  * There must be room for storing this new event into the event log buffer.
  */
-void event_log_record(const uint8_t *hash, uint32_t event_type,
-		      const event_log_metadata_t *metadata_ptr)
+static void event_log_record(const uint8_t *hash,
+			     const event_log_metadata_t *metadata_ptr)
 {
 	void *ptr = log_ptr;
-	uint32_t name_len = 0U;
+	uint32_t name_len;
 
 	assert(hash != NULL);
 	assert(metadata_ptr != NULL);
-	/* event_log_buf_init() must have been called prior to this. */
+	assert(metadata_ptr->name != NULL);
+	/* event_log_init() must have been called prior to this. */
 	assert(log_ptr != NULL);
 
-	if (metadata_ptr->name != NULL) {
-		name_len = (uint32_t)strlen(metadata_ptr->name) + 1U;
-	}
+	name_len = (uint32_t)strlen(metadata_ptr->name) + 1U;
 
 	/* Check for space in Event Log buffer */
 	assert(((uintptr_t)ptr + (uint32_t)EVENT2_HDR_SIZE + name_len) <
@@ -113,7 +115,7 @@ void event_log_record(const uint8_t *hash, uint32_t event_type,
 	((event2_header_t *)ptr)->pcr_index = metadata_ptr->pcr;
 
 	/* TCG_PCR_EVENT2.EventType */
-	((event2_header_t *)ptr)->event_type = event_type;
+	((event2_header_t *)ptr)->event_type = EV_POST_CODE;
 
 	/* TCG_PCR_EVENT2.Digests.Count */
 	ptr = (uint8_t *)ptr + offsetof(event2_header_t, digests);
@@ -137,23 +139,12 @@ void event_log_record(const uint8_t *hash, uint32_t event_type,
 	((event2_data_t *)ptr)->event_size = name_len;
 
 	/* Copy event data to TCG_PCR_EVENT2.Event */
-	if (metadata_ptr->name != NULL) {
-		(void)memcpy((void *)(((event2_data_t *)ptr)->event),
-				(const void *)metadata_ptr->name, name_len);
-	}
+	(void)memcpy((void *)(((event2_data_t *)ptr)->event),
+			(const void *)metadata_ptr->name, name_len);
 
 	/* End of event data */
 	log_ptr = (uint8_t *)((uintptr_t)ptr +
 			offsetof(event2_data_t, event) + name_len);
-}
-
-void event_log_buf_init(uint8_t *event_log_start, uint8_t *event_log_finish)
-{
-	assert(event_log_start != NULL);
-	assert(event_log_finish > event_log_start);
-
-	log_ptr = event_log_start;
-	log_end = (uintptr_t)event_log_finish;
 }
 
 /*
@@ -167,16 +158,30 @@ void event_log_buf_init(uint8_t *event_log_start, uint8_t *event_log_finish)
  */
 void event_log_init(uint8_t *event_log_start, uint8_t *event_log_finish)
 {
-	event_log_buf_init(event_log_start, event_log_finish);
+	assert(event_log_start != NULL);
+	assert(event_log_finish > event_log_start);
+
+	log_ptr = event_log_start;
+	log_end = (uintptr_t)event_log_finish;
+
+	/* Get pointer to platform's event_log_metadata_t structure */
+	plat_metadata_ptr = plat_event_log_get_metadata();
+	assert(plat_metadata_ptr != NULL);
 }
 
-void event_log_write_specid_event(void)
+/*
+ * Initialises Event Log by writing Specification ID and
+ * Startup Locality events
+ */
+void event_log_write_header(void)
 {
+	const char locality_signature[] = TCG_STARTUP_LOCALITY_SIGNATURE;
 	void *ptr = log_ptr;
 
-	/* event_log_buf_init() must have been called prior to this. */
+	/* event_log_init() must have been called prior to this. */
 	assert(log_ptr != NULL);
-	assert(((uintptr_t)log_ptr + ID_EVENT_SIZE) < log_end);
+	assert(((uintptr_t)log_ptr + ID_EVENT_SIZE + LOC_EVENT_SIZE) <
+		log_end);
 
 	/*
 	 * Add Specification ID Event first
@@ -197,23 +202,8 @@ void event_log_write_specid_event(void)
 	 * No vendor data
 	 */
 	((id_event_struct_data_t *)ptr)->vendor_info_size = 0;
-	log_ptr = (uint8_t *)((uintptr_t)ptr +
+	ptr = (uint8_t *)((uintptr_t)ptr +
 			offsetof(id_event_struct_data_t, vendor_info));
-}
-
-/*
- * Initialises Event Log by writing Specification ID and
- * Startup Locality events
- */
-void event_log_write_header(void)
-{
-	const char locality_signature[] = TCG_STARTUP_LOCALITY_SIGNATURE;
-	void *ptr;
-
-	event_log_write_specid_event();
-
-	ptr = log_ptr;
-	assert(((uintptr_t)log_ptr + LOC_EVENT_SIZE) < log_end);
 
 	/*
 	 * The Startup Locality event should be placed in the log before
@@ -252,14 +242,6 @@ void event_log_write_header(void)
 	log_ptr = (uint8_t *)((uintptr_t)ptr + sizeof(startup_locality_event_t));
 }
 
-int event_log_measure(uintptr_t data_base, uint32_t data_size,
-		      unsigned char hash_data[CRYPTO_MD_MAX_SIZE])
-{
-	/* Calculate hash */
-	return crypto_mod_calc_hash(CRYPTO_MD_ID,
-				    (void *)data_base, data_size, hash_data);
-}
-
 /*
  * Calculate and write hash of image, configuration data, etc.
  * to Event Log.
@@ -267,19 +249,16 @@ int event_log_measure(uintptr_t data_base, uint32_t data_size,
  * @param[in] data_base		Address of data
  * @param[in] data_size		Size of data
  * @param[in] data_id		Data ID
- * @param[in] metadata_ptr	Event Log metadata
  * @return:
  *	0 = success
  *    < 0 = error
  */
 int event_log_measure_and_record(uintptr_t data_base, uint32_t data_size,
-				 uint32_t data_id,
-				 const event_log_metadata_t *metadata_ptr)
+				 uint32_t data_id)
 {
 	unsigned char hash_data[CRYPTO_MD_MAX_SIZE];
 	int rc;
-
-	assert(metadata_ptr != NULL);
+	const event_log_metadata_t *metadata_ptr = plat_metadata_ptr;
 
 	/* Get the metadata associated with this image. */
 	while ((metadata_ptr->id != EVLOG_INVALID_ID) &&
@@ -288,13 +267,14 @@ int event_log_measure_and_record(uintptr_t data_base, uint32_t data_size,
 	}
 	assert(metadata_ptr->id != EVLOG_INVALID_ID);
 
-	/* Measure the payload with algorithm selected by EventLog driver */
-	rc = event_log_measure(data_base, data_size, hash_data);
+	/* Calculate hash */
+	rc = crypto_mod_calc_hash(CRYPTO_MD_ID,
+				  (void *)data_base, data_size, hash_data);
 	if (rc != 0) {
 		return rc;
 	}
 
-	event_log_record(hash_data, EV_POST_CODE, metadata_ptr);
+	event_log_record(hash_data, metadata_ptr);
 
 	return 0;
 }

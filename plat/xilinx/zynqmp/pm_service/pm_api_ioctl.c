@@ -1,6 +1,5 @@
 /*
- * Copyright (c) 2018-2022, Arm Limited and Contributors. All rights reserved.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (c) 2018-2022, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -13,23 +12,22 @@
 #include <drivers/delay_timer.h>
 #include <lib/mmio.h>
 #include <plat/common/platform.h>
+#include <zynqmp_def.h>
 
 #include "pm_api_clock.h"
 #include "pm_api_ioctl.h"
+#include "pm_api_sys.h"
 #include "pm_client.h"
 #include "pm_common.h"
 #include "pm_ipi.h"
-#include <zynqmp_def.h>
-#include "zynqmp_pm_api_sys.h"
 
 /**
- * pm_ioctl_get_rpu_oper_mode () - Get current RPU operation mode.
- * @mode: Buffer to store value of oper mode(Split/Lock-step)
+ * pm_ioctl_get_rpu_oper_mode () - Get current RPU operation mode
+ * @mode	Buffer to store value of oper mode(Split/Lock-step)
  *
  * This function provides current configured RPU operational mode.
  *
- * Return: Returns status, either success or error+reason.
- *
+ * @return	Returns status, either success or error+reason
  */
 static enum pm_ret_status pm_ioctl_get_rpu_oper_mode(uint32_t *mode)
 {
@@ -47,16 +45,15 @@ static enum pm_ret_status pm_ioctl_get_rpu_oper_mode(uint32_t *mode)
 }
 
 /**
- * pm_ioctl_set_rpu_oper_mode () - Configure RPU operation mode.
- * @mode: Value to set for oper mode(Split/Lock-step).
+ * pm_ioctl_set_rpu_oper_mode () - Configure RPU operation mode
+ * @mode	Value to set for oper mode(Split/Lock-step)
  *
  * This function configures RPU operational mode(Split/Lock-step).
  * It also sets TCM combined mode in RPU lock-step and TCM non-combined
  * mode for RPU split mode. In case of Lock step mode, RPU1's output is
  * clamped.
  *
- * Return: Returns status, either success or error+reason.
- *
+ * @return	Returns status, either success or error+reason
  */
 static enum pm_ret_status pm_ioctl_set_rpu_oper_mode(uint32_t mode)
 {
@@ -86,14 +83,13 @@ static enum pm_ret_status pm_ioctl_set_rpu_oper_mode(uint32_t mode)
 }
 
 /**
- * pm_ioctl_config_boot_addr() - Configure RPU boot address.
- * @nid: Node ID of RPU.
- * @value: Value to set for boot address (TCM/OCM).
+ * pm_ioctl_config_boot_addr() - Configure RPU boot address
+ * @nid		Node ID of RPU
+ * @value	Value to set for boot address (TCM/OCM)
  *
  * This function configures RPU boot address(memory).
  *
- * Return: Returns status, either success or error+reason.
- *
+ * @return	Returns status, either success or error+reason
  */
 static enum pm_ret_status pm_ioctl_config_boot_addr(enum pm_node_id nid,
 						    uint32_t value)
@@ -124,14 +120,13 @@ static enum pm_ret_status pm_ioctl_config_boot_addr(enum pm_node_id nid,
 }
 
 /**
- * pm_ioctl_config_tcm_comb() - Configure TCM combined mode.
- * @value: Value to set (Split/Combined).
+ * pm_ioctl_config_tcm_comb() - Configure TCM combined mode
+ * @value	Value to set (Split/Combined)
  *
  * This function configures TCM to be in split mode or combined
  * mode.
  *
- * Return: Returns status, either success or error+reason.
- *
+ * @return	Returns status, either success or error+reason
  */
 static enum pm_ret_status pm_ioctl_config_tcm_comb(uint32_t value)
 {
@@ -153,14 +148,13 @@ static enum pm_ret_status pm_ioctl_config_tcm_comb(uint32_t value)
 }
 
 /**
- * pm_ioctl_set_tapdelay_bypass() -  Enable/Disable tap delay bypass.
- * @type: Type of tap delay to enable/disable (e.g. QSPI).
- * @value: Enable/Disable.
+ * pm_ioctl_set_tapdelay_bypass() -  Enable/Disable tap delay bypass
+ * @type	Type of tap delay to enable/disable (e.g. QSPI)
+ * @value	Enable/Disable
  *
  * This function enable/disable tap delay bypass.
  *
- * Return: Returns status, either success or error+reason.
- *
+ * @return	Returns status, either success or error+reason
  */
 static enum pm_ret_status pm_ioctl_set_tapdelay_bypass(uint32_t type,
 						       uint32_t value)
@@ -174,14 +168,73 @@ static enum pm_ret_status pm_ioctl_set_tapdelay_bypass(uint32_t type,
 }
 
 /**
- * pm_ioctl_sd_dll_reset() -  Reset DLL logic.
- * @nid: Node ID of the device.
- * @type: Reset type.
+ * pm_ioctl_set_sgmii_mode() -  Set SGMII mode for the GEM device
+ * @nid		Node ID of the device
+ * @value	Enable/Disable
+ *
+ * This function enable/disable SGMII mode for the GEM device.
+ * While enabling SGMII mode, it also ties the GEM PCS Signal
+ * Detect to 1 and selects EMIO for RX clock generation.
+ *
+ * @return	Returns status, either success or error+reason
+ */
+static enum pm_ret_status pm_ioctl_set_sgmii_mode(enum pm_node_id nid,
+						  uint32_t value)
+{
+	uint32_t val, mask, shift;
+	enum pm_ret_status ret;
+
+	if (value != PM_SGMII_DISABLE && value != PM_SGMII_ENABLE) {
+		return PM_RET_ERROR_ARGS;
+	}
+
+	switch (nid) {
+	case NODE_ETH_0:
+		shift = 0;
+		break;
+	case NODE_ETH_1:
+		shift = 1;
+		break;
+	case NODE_ETH_2:
+		shift = 2;
+		break;
+	case NODE_ETH_3:
+		shift = 3;
+		break;
+	default:
+		return PM_RET_ERROR_ARGS;
+	}
+
+	if (value == PM_SGMII_DISABLE) {
+		mask = GEM_SGMII_MASK << GEM_CLK_CTRL_OFFSET * shift;
+		ret = pm_mmio_write(IOU_GEM_CLK_CTRL, mask, 0U);
+	} else {
+		/* Tie the GEM PCS Signal Detect to 1 */
+		mask = SGMII_SD_MASK << SGMII_SD_OFFSET * shift;
+		val = SGMII_PCS_SD_1 << SGMII_SD_OFFSET * shift;
+		ret = pm_mmio_write(IOU_GEM_CTRL, mask, val);
+		if (ret != PM_RET_SUCCESS) {
+			return ret;
+		}
+
+		/* Set the GEM to SGMII mode */
+		mask = GEM_CLK_CTRL_MASK << GEM_CLK_CTRL_OFFSET * shift;
+		val = GEM_RX_SRC_SEL_GTR | GEM_SGMII_MODE;
+		val <<= GEM_CLK_CTRL_OFFSET * shift;
+		ret =  pm_mmio_write(IOU_GEM_CLK_CTRL, mask, val);
+	}
+
+	return ret;
+}
+
+/**
+ * pm_ioctl_sd_dll_reset() -  Reset DLL logic
+ * @nid		Node ID of the device
+ * @type	Reset type
  *
  * This function resets DLL logic for the SD device.
  *
- * Return: Returns status, either success or error+reason.
- *
+ * @return	Returns status, either success or error+reason
  */
 static enum pm_ret_status pm_ioctl_sd_dll_reset(enum pm_node_id nid,
 						uint32_t type)
@@ -224,15 +277,14 @@ static enum pm_ret_status pm_ioctl_sd_dll_reset(enum pm_node_id nid,
 }
 
 /**
- * pm_ioctl_sd_set_tapdelay() -  Set tap delay for the SD device.
- * @nid: Node ID of the device.
- * @type: Type of tap delay to set (input/output).
- * @value: Value to set fot the tap delay.
+ * pm_ioctl_sd_set_tapdelay() -  Set tap delay for the SD device
+ * @nid		Node ID of the device
+ * @type	Type of tap delay to set (input/output)
+ * @value	Value to set fot the tap delay
  *
  * This function sets input/output tap delay for the SD device.
  *
- * Return: Returns status, either success or error+reason.
- *
+ * @return	Returns status, either success or error+reason
  */
 static enum pm_ret_status pm_ioctl_sd_set_tapdelay(enum pm_node_id nid,
 						   enum tap_delay_type type,
@@ -322,14 +374,14 @@ reset_release:
 }
 
 /**
- * pm_ioctl_set_pll_frac_mode() -  Ioctl function for setting pll mode.
- * @pll: PLL clock id.
- * @mode: Mode fraction/integar.
+ * pm_ioctl_set_pll_frac_mode() -  Ioctl function for
+ *				   setting pll mode
+ * @pll     PLL clock id
+ * @mode    Mode fraction/integar
  *
- * This function sets PLL mode.
+ * This function sets PLL mode
  *
- * Return: Returns status, either success or error+reason.
- *
+ * @return      Returns status, either success or error+reason
  */
 static enum pm_ret_status pm_ioctl_set_pll_frac_mode
 			(uint32_t pll, uint32_t mode)
@@ -338,14 +390,14 @@ static enum pm_ret_status pm_ioctl_set_pll_frac_mode
 }
 
 /**
- * pm_ioctl_get_pll_frac_mode() -  Ioctl function for getting pll mode.
- * @pll: PLL clock id.
- * @mode: Mode fraction/integar.
+ * pm_ioctl_get_pll_frac_mode() -  Ioctl function for
+ *				   getting pll mode
+ * @pll     PLL clock id
+ * @mode    Mode fraction/integar
  *
- * This function return current PLL mode.
+ * This function return current PLL mode
  *
- * Return: Returns status, either success or error+reason.
- *
+ * @return      Returns status, either success or error+reason
  */
 static enum pm_ret_status pm_ioctl_get_pll_frac_mode
 			(uint32_t pll, uint32_t *mode)
@@ -354,15 +406,15 @@ static enum pm_ret_status pm_ioctl_get_pll_frac_mode
 }
 
 /**
- * pm_ioctl_set_pll_frac_data() -  Ioctl function for setting pll fraction data.
- * @pll: PLL clock id.
- * @data: fraction data.
+ * pm_ioctl_set_pll_frac_data() -  Ioctl function for
+ *				   setting pll fraction data
+ * @pll     PLL clock id
+ * @data    fraction data
  *
  * This function sets fraction data.
  * It is valid for fraction mode only.
  *
- * Return: Returns status, either success or error+reason.
- *
+ * @return      Returns status, either success or error+reason
  */
 static enum pm_ret_status pm_ioctl_set_pll_frac_data
 			(uint32_t pll, uint32_t data)
@@ -380,14 +432,14 @@ static enum pm_ret_status pm_ioctl_set_pll_frac_data
 }
 
 /**
- * pm_ioctl_get_pll_frac_data() -  Ioctl function for getting pll fraction data.
- * @pll: PLL clock id.
- * @data: fraction data.
+ * pm_ioctl_get_pll_frac_data() -  Ioctl function for
+ *				   getting pll fraction data
+ * @pll     PLL clock id
+ * @data    fraction data
  *
  * This function returns fraction data value.
  *
- * Return: Returns status, either success or error+reason.
- *
+ * @return      Returns status, either success or error+reason
  */
 static enum pm_ret_status pm_ioctl_get_pll_frac_data
 			(uint32_t pll, uint32_t *data)
@@ -405,15 +457,14 @@ static enum pm_ret_status pm_ioctl_get_pll_frac_data
 }
 
 /**
- * pm_ioctl_write_ggs() - Ioctl function for writing global general storage
- *                        (ggs).
- * @index: GGS register index.
- * @value: Register value to be written.
+ * pm_ioctl_write_ggs() - Ioctl function for writing
+ *			  global general storage (ggs)
+ * @index	GGS register index
+ * @value	Register value to be written
  *
  * This function writes value to GGS register.
  *
- * Return: Returns status, either success or error+reason.
- *
+ * @return      Returns status, either success or error+reason
  */
 static enum pm_ret_status pm_ioctl_write_ggs(uint32_t index,
 					     uint32_t value)
@@ -427,15 +478,14 @@ static enum pm_ret_status pm_ioctl_write_ggs(uint32_t index,
 }
 
 /**
- * pm_ioctl_read_ggs() - Ioctl function for reading global general storage
- *                       (ggs).
- * @index: GGS register index.
- * @value: Register value.
+ * pm_ioctl_read_ggs() - Ioctl function for reading
+ *			 global general storage (ggs)
+ * @index	GGS register index
+ * @value	Register value
  *
  * This function returns GGS register value.
  *
- * Return: Returns status, either success or error+reason.
- *
+ * @return      Returns status, either success or error+reason
  */
 static enum pm_ret_status pm_ioctl_read_ggs(uint32_t index,
 					    uint32_t *value)
@@ -448,15 +498,14 @@ static enum pm_ret_status pm_ioctl_read_ggs(uint32_t index,
 }
 
 /**
- * pm_ioctl_write_pggs() - Ioctl function for writing persistent global general
- *                         storage (pggs).
- * @index: PGGS register index.
- * @value: Register value to be written.
+ * pm_ioctl_write_pggs() - Ioctl function for writing persistent
+ *			   global general storage (pggs)
+ * @index	PGGS register index
+ * @value	Register value to be written
  *
  * This function writes value to PGGS register.
  *
- * Return: Returns status, either success or error+reason.
- *
+ * @return      Returns status, either success or error+reason
  */
 static enum pm_ret_status pm_ioctl_write_pggs(uint32_t index,
 					      uint32_t value)
@@ -470,12 +519,13 @@ static enum pm_ret_status pm_ioctl_write_pggs(uint32_t index,
 }
 
 /**
- * pm_ioctl_afi() - Ioctl function for writing afi values.
- * @index: AFI register index.
- * @value: Register value to be written.
+ * pm_ioctl_afi() - Ioctl function for writing afi values
  *
- * Return: Returns status, either success or error+reason.
+ * @index 	AFI register index
+ * @value	Register value to be written
  *
+ *
+ * @return      Returns status, either success or error+reason
  */
 static enum pm_ret_status pm_ioctl_afi(uint32_t index,
 					      uint32_t value)
@@ -503,7 +553,7 @@ static enum pm_ret_status pm_ioctl_afi(uint32_t index,
 		return PM_RET_ERROR_ARGS;
 	}
 
-	if (index <= AFIFM6_WRCTRL) {
+	if (index < AFIFM6_WRCTRL) {
 		mask = FABRIC_WIDTH;
 	} else {
 		mask = 0xf00;
@@ -513,15 +563,14 @@ static enum pm_ret_status pm_ioctl_afi(uint32_t index,
 }
 
 /**
- * pm_ioctl_read_pggs() - Ioctl function for reading persistent global general
- *                        storage (pggs).
- * @index: PGGS register index.
- * @value: Register value.
+ * pm_ioctl_read_pggs() - Ioctl function for reading persistent
+ *			  global general storage (pggs)
+ * @index	PGGS register index
+ * @value	Register value
  *
  * This function returns PGGS register value.
  *
- * Return: Returns status, either success or error+reason.
- *
+ * @return      Returns status, either success or error+reason
  */
 static enum pm_ret_status pm_ioctl_read_pggs(uint32_t index,
 					     uint32_t *value)
@@ -534,12 +583,12 @@ static enum pm_ret_status pm_ioctl_read_pggs(uint32_t index,
 }
 
 /**
- * pm_ioctl_ulpi_reset() - Ioctl function for performing ULPI reset.
- *
- * Return: Returns status, either success or error+reason.
+ * pm_ioctl_ulpi_reset() - Ioctl function for performing ULPI reset
  *
  * This function peerforms the ULPI reset sequence for resetting
  * the ULPI transceiver.
+ *
+ * @return      Returns status, either success or error+reason
  */
 static enum pm_ret_status pm_ioctl_ulpi_reset(void)
 {
@@ -570,14 +619,12 @@ static enum pm_ret_status pm_ioctl_ulpi_reset(void)
 }
 
 /**
- * pm_ioctl_set_boot_health_status() - Ioctl for setting healthy boot status.
- * @value: Value to write.
+ * pm_ioctl_set_boot_health_status() - Ioctl for setting healthy boot status
  *
  * This function sets healthy bit value to indicate boot health status
  * to firmware.
  *
- * Return: Returns status, either success or error+reason.
- *
+ * @return      Returns status, either success or error+reason
  */
 static enum pm_ret_status pm_ioctl_set_boot_health_status(uint32_t value)
 {
@@ -586,17 +633,16 @@ static enum pm_ret_status pm_ioctl_set_boot_health_status(uint32_t value)
 }
 
 /**
- * pm_api_ioctl() -  PM IOCTL API for device control and configs.
- * @nid: Node ID of the device.
- * @ioctl_id: ID of the requested IOCTL.
- * @arg1: Argument 1 to requested IOCTL call.
- * @arg2: Argument 2 to requested IOCTL call.
- * @value: Returned output value.
+ * pm_api_ioctl() -  PM IOCTL API for device control and configs
+ * @node_id	Node ID of the device
+ * @ioctl_id	ID of the requested IOCTL
+ * @arg1	Argument 1 to requested IOCTL call
+ * @arg2	Argument 2 to requested IOCTL call
+ * @value	Returned output value
  *
  * This function calls IOCTL to firmware for device control and configuration.
  *
- * Return: Returns status, either success or error+reason.
- *
+ * @return	Returns status, either success or error+reason
  */
 enum pm_ret_status pm_api_ioctl(enum pm_node_id nid,
 				uint32_t ioctl_id,
@@ -622,6 +668,9 @@ enum pm_ret_status pm_api_ioctl(enum pm_node_id nid,
 		break;
 	case IOCTL_SET_TAPDELAY_BYPASS:
 		ret = pm_ioctl_set_tapdelay_bypass(arg1, arg2);
+		break;
+	case IOCTL_SET_SGMII_MODE:
+		ret = pm_ioctl_set_sgmii_mode(nid, arg1);
 		break;
 	case IOCTL_SD_DLL_RESET:
 		ret = pm_ioctl_sd_dll_reset(nid, arg1);
@@ -674,13 +723,10 @@ enum pm_ret_status pm_api_ioctl(enum pm_node_id nid,
 }
 
 /**
- * tfa_ioctl_bitmask() -  API to get supported IOCTL ID mask.
- * @bit_mask: Returned bit mask of supported IOCTL IDs.
- *
- * Return: 0 success, negative value for errors.
- *
+ * pm_update_ioctl_bitmask() -  API to get supported IOCTL ID mask
+ * @bit_mask		Returned bit mask of supported IOCTL IDs
  */
-enum pm_ret_status tfa_ioctl_bitmask(uint32_t *bit_mask)
+enum pm_ret_status atf_ioctl_bitmask(uint32_t *bit_mask)
 {
 	uint8_t supported_ids[] = {
 		IOCTL_GET_RPU_OPER_MODE,
@@ -688,6 +734,7 @@ enum pm_ret_status tfa_ioctl_bitmask(uint32_t *bit_mask)
 		IOCTL_RPU_BOOT_ADDR_CONFIG,
 		IOCTL_TCM_COMB_CONFIG,
 		IOCTL_SET_TAPDELAY_BYPASS,
+		IOCTL_SET_SGMII_MODE,
 		IOCTL_SD_DLL_RESET,
 		IOCTL_SET_SD_TAPDELAY,
 		IOCTL_SET_PLL_FRAC_MODE,
@@ -712,7 +759,7 @@ enum pm_ret_status tfa_ioctl_bitmask(uint32_t *bit_mask)
 		}
 		ret = check_api_dependency(ioctl_id);
 		if (ret == PM_RET_SUCCESS) {
-			bit_mask[ioctl_id / 32U] |= BIT(ioctl_id % 32U);
+			bit_mask[ioctl_id / 32] |= BIT(ioctl_id % 32);
 		}
 	}
 
